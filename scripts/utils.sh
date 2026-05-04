@@ -226,6 +226,7 @@ get_env_var_or_default() {
 oci_cmd_data() {
     local cmd=("$@")
     local output
+    local stderr_out
     local status
     local oci_args=()
     
@@ -235,8 +236,9 @@ oci_cmd_data() {
     
     log_debug "执行 OCI 数据命令: oci ${oci_args[*]} ${cmd[*]}"
     
+    stderr_out=$(mktemp)
     set +e
-    output=$(SUPPRESS_LABEL_WARNING=True oci "${oci_args[@]}" "${cmd[@]}" 2>/dev/null)
+    output=$(SUPPRESS_LABEL_WARNING=True oci "${oci_args[@]}" "${cmd[@]}" 2>"$stderr_out")
     status=$?
     set -e
     
@@ -244,9 +246,12 @@ oci_cmd_data() {
         log_error "OCI 数据命令失败，状态码: $status"
         log_error "命令: ${cmd[*]}"
         log_error "输出: $output"
+        log_error "错误详情: $(head -5 "$stderr_out" 2>/dev/null)"
+        rm -f "$stderr_out"
         return $status
     fi
     
+    rm -f "$stderr_out"
     echo "$output"
 }
 

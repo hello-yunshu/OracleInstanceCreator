@@ -148,7 +148,7 @@ count_actual_instances() {
         --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
         --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
         --query 'data[0].id' \
-        --raw-output 2>&1) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
+        --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
         ((actual_count++))
     else
         # Log API failures for debugging while maintaining graceful degradation
@@ -164,7 +164,7 @@ count_actual_instances() {
         --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
         --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
         --query 'data[0].id' \
-        --raw-output 2>&1) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
+        --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
         ((actual_count++))
     else
         # Log API failures for debugging while maintaining graceful degradation
@@ -250,7 +250,7 @@ verify_and_update_state() {
             --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
             --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
             --query 'data[0].id' \
-            --raw-output 2>/dev/null); then
+            --raw-output); then
             
             if [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
                 log_info "已验证 A1.Flex 实例存在: $a1_instance_id"
@@ -277,7 +277,7 @@ verify_and_update_state() {
             --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
             --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
             --query 'data[0].id' \
-            --raw-output 2>/dev/null); then
+            --raw-output); then
             
             if [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
                 log_info "已验证 E2.Micro 实例存在: $e2_instance_id"
