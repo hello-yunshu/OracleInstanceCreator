@@ -236,7 +236,7 @@ oci_cmd_data() {
     log_debug "执行 OCI 数据命令: oci ${oci_args[*]} ${cmd[*]}"
     
     set +e
-    output=$(oci "${oci_args[@]}" "${cmd[@]}" 2>&1)
+    output=$(SUPPRESS_LABEL_WARNING=True oci "${oci_args[@]}" "${cmd[@]}" 2>/dev/null)
     status=$?
     set -e
     
@@ -346,7 +346,7 @@ oci_cmd_debug() {
     log_debug "执行 OCI 调试命令: oci ${oci_args[*]} $redacted_cmd_str"
     
     set +e
-    output=$(oci "${oci_args[@]}" "${cmd[@]}" 2>&1)
+    output=$(SUPPRESS_LABEL_WARNING=True oci "${oci_args[@]}" "${cmd[@]}" 2>&1)
     status=$?
     set -e
     
