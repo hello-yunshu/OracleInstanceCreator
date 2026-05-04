@@ -369,6 +369,27 @@ main() {
     local should_launch_a1=true
     local should_launch_e2=true
     
+    # Check SKIP_SHAPES environment variable (comma-separated: "E2" or "A1" or "E2,A1")
+    local skip_shapes="${SKIP_SHAPES:-}"
+    if [[ -n "$skip_shapes" ]]; then
+        IFS=',' read -ra skip_list <<< "$skip_shapes"
+        for shape in "${skip_list[@]}"; do
+            local shape_upper=$(echo "$shape" | tr '[:lower:]' '[:upper:]' | tr -d ' ')
+            case "$shape_upper" in
+                E2|E2.*|MICRO|AMD)
+                    should_launch_e2=false
+                    log_info "E2.1.Micro: 已通过 SKIP_SHAPES 跳过"
+                    echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$e2_result"
+                    ;;
+                A1|A1.*|FLEX|ARM)
+                    should_launch_a1=false
+                    log_info "A1.Flex: 已通过 SKIP_SHAPES 跳过"
+                    echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$a1_result"
+                    ;;
+            esac
+        done
+    fi
+    
     # Initialize state manager to ensure state file exists
     if ! init_state_manager "$state_file" >/dev/null; then
         log_warning "状态管理器初始化失败，继续尝试所有形状"

@@ -230,7 +230,7 @@
 | `OCI_OCPUS` | `4` | CPU 核心数（仅 Flex 形状） |
 | `OCI_MEMORY_IN_GBS` | `24` | 内存 GB（仅 Flex 形状） |
 | `BOOT_VOLUME_SIZE` | `50` | 引导卷大小（GB，最低 50） |
-| `ASSIGN_PUBLIC_IP` | `false` | 是否分配公网 IP |
+| `ASSIGN_PUBLIC_IP` | `true` | 是否分配公网 IP |
 | `RECOVERY_ACTION` | `RESTORE_INSTANCE` | 实例恢复策略 |
 
 ### 重试配置

@@ -53,7 +53,7 @@ validate_instance_configuration() {
     export INSTANCE_DISPLAY_NAME="${INSTANCE_DISPLAY_NAME:-oci-free-instance}"
     export OPERATING_SYSTEM="${OPERATING_SYSTEM:-Oracle Linux}"
     export OS_VERSION="${OS_VERSION:-10}"
-    export ASSIGN_PUBLIC_IP="${ASSIGN_PUBLIC_IP:-false}"
+    export ASSIGN_PUBLIC_IP="${ASSIGN_PUBLIC_IP:-true}"
     
     # New configuration options with defaults
     export BOOT_VOLUME_SIZE="${BOOT_VOLUME_SIZE:-50}"

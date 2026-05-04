@@ -112,6 +112,8 @@ jobs:
       # 实例恢复和兼容性设置
       RECOVERY_ACTION: "RESTORE_INSTANCE"
       LEGACY_IMDS_ENDPOINTS: "false"
+      # 跳过指定形状（逗号分隔，如 "E2" 只申请 A1，"A1" 只申请 E2）
+      SKIP_SHAPES: ${{ secrets.SKIP_SHAPES || 'E2' }}
       # 多 AD 循环的重试配置
       RETRY_WAIT_TIME: "30"
       # 瞬态错误重试配置（在同一 AD 重试后再切换）

@@ -13,7 +13,7 @@ profiles:
     memory_gb: 24
     operating_system: "Oracle Linux"
     os_version: "10"
-    assign_public_ip: false
+    assign_public_ip: true
 
   # Alternative AMD instance
   amd-singapore:
@@ -23,7 +23,7 @@ profiles:
     shape: "VM.Standard.E2.1.Micro"
     operating_system: "Oracle Linux"
     os_version: "10"
-    assign_public_ip: false
+    assign_public_ip: true
 
   # ARM instance with public IP
   arm-singapore-public:
@@ -47,7 +47,7 @@ profiles:
     memory_gb: 24
     operating_system: "Oracle Linux"
     os_version: "10"
-    assign_public_ip: false
+    assign_public_ip: true
 
   # Ubuntu instance
   arm-ubuntu:
@@ -59,7 +59,7 @@ profiles:
     memory_gb: 24
     operating_system: "Canonical Ubuntu"
     os_version: "24.04"
-    assign_public_ip: false
+    assign_public_ip: true
 
 # Default profile to use if none specified
 default_profile: "arm-singapore"

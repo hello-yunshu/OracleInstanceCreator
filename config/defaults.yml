@@ -7,7 +7,7 @@ defaults:
   instance_display_name: "oci-free-instance"
 
   # Network configuration
-  assign_public_ip: false
+  assign_public_ip: true
   assign_private_dns_record: true
 
   # Retry configuration

@@ -72,7 +72,7 @@ These can be set in the GitHub Actions workflow file:
 | `OCI_OCPUS` | Number of OCPUs (flexible shapes) | `4` |
 | `OCI_MEMORY_IN_GBS` | Memory in GB (flexible shapes) | `24` |
 | `INSTANCE_DISPLAY_NAME` | Instance display name | `a1-sg` |
-| `ASSIGN_PUBLIC_IP` | Assign public IP | `false` |
+| `ASSIGN_PUBLIC_IP` | Assign public IP | `true` |
 | `OPERATING_SYSTEM` | Operating system | `Oracle Linux` |
 | `OS_VERSION` | OS version | `10` |
 
