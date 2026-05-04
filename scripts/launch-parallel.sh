@@ -243,28 +243,49 @@ verify_and_update_state() {
         return 2
     fi
     
+    verify_instance_exists() {
+        local display_name="$1"
+        local comp_id="$2"
+        local max_retries=3
+        local retry_delay=3
+        
+        local instance_id=""
+        for i in $(seq 1 $max_retries); do
+            instance_id=$(oci_cmd compute instance list \
+                --compartment-id "$comp_id" \
+                --display-name "$display_name" \
+                --limit 1 \
+                --query 'data[0].id' \
+                --raw-output 2>/dev/null || echo "")
+            
+            if [[ -n "$instance_id" && "$instance_id" != "null" ]]; then
+                echo "$instance_id"
+                return 0
+            fi
+            
+            if [[ $i -lt $max_retries ]]; then
+                log_debug "实例 '$display_name' 未找到，${retry_delay}s 后重试 ($i/$max_retries)..."
+                sleep $retry_delay
+            fi
+        done
+        
+        echo ""
+        return 1
+    }
+    
     # Verify A1.Flex instance state if creation was attempted
     if [[ "$status_a1" -eq 0 ]]; then
         local a1_instance_id
-        if a1_instance_id=$(oci_cmd compute instance list \
-            --compartment-id "$comp_id" \
-            --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-            --limit 1 \
-            --query 'data[0].id' \
-            --raw-output); then
-            
-            if [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
-                log_info "已验证 A1.Flex 实例存在: $a1_instance_id"
-                if ! record_instance_verification "${A1_FLEX_CONFIG[DISPLAY_NAME]}" "$a1_instance_id" "verified" "$state_file"; then
-                    log_warning "记录 A1.Flex 实例验证失败"
-                    ((verification_errors++))
-                fi
-            else
-                log_warning "A1.Flex 实例创建报告成功但 API 未找到实例"
+        a1_instance_id=$(verify_instance_exists "${A1_FLEX_CONFIG[DISPLAY_NAME]}" "$comp_id")
+        
+        if [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
+            log_info "已验证 A1.Flex 实例存在: $a1_instance_id"
+            if ! record_instance_verification "${A1_FLEX_CONFIG[DISPLAY_NAME]}" "$a1_instance_id" "verified" "$state_file"; then
+                log_warning "记录 A1.Flex 实例验证失败"
                 ((verification_errors++))
             fi
         else
-            log_error "通过 OCI API 查询 A1.Flex 实例状态失败"
+            log_warning "A1.Flex 实例创建报告成功但 API 未找到实例（可能需要更长时间出现在 API 中）"
             ((verification_errors++))
         fi
     fi
@@ -272,25 +293,16 @@ verify_and_update_state() {
     # Verify E2.Micro instance state if creation was attempted
     if [[ "$status_e2" -eq 0 ]]; then
         local e2_instance_id
-        if e2_instance_id=$(oci_cmd compute instance list \
-            --compartment-id "$comp_id" \
-            --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-            --limit 1 \
-            --query 'data[0].id' \
-            --raw-output); then
-            
-            if [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
-                log_info "已验证 E2.Micro 实例存在: $e2_instance_id"
-                if ! record_instance_verification "${E2_MICRO_CONFIG[DISPLAY_NAME]}" "$e2_instance_id" "verified" "$state_file"; then
-                    log_warning "记录 E2.Micro 实例验证失败"
-                    ((verification_errors++))
-                fi
-            else
-                log_warning "E2.Micro 实例创建报告成功但 API 未找到实例"
+        e2_instance_id=$(verify_instance_exists "${E2_MICRO_CONFIG[DISPLAY_NAME]}" "$comp_id")
+        
+        if [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
+            log_info "已验证 E2.Micro 实例存在: $e2_instance_id"
+            if ! record_instance_verification "${E2_MICRO_CONFIG[DISPLAY_NAME]}" "$e2_instance_id" "verified" "$state_file"; then
+                log_warning "记录 E2.Micro 实例验证失败"
                 ((verification_errors++))
             fi
         else
-            log_error "通过 OCI API 查询 E2.Micro 实例状态失败"
+            log_warning "E2.Micro 实例创建报告成功但 API 未找到实例（可能需要更长时间出现在 API 中）"
             ((verification_errors++))
         fi
     fi
