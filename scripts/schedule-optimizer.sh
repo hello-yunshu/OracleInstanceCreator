@@ -24,13 +24,13 @@ get_regional_pattern() {
         "eu-amsterdam-1") echo "CET|UTC+1|8am-1pm CET 低使用率" ;;
         "ca-toronto-1") echo "EST|UTC-5|2am-7am ET 低使用率" ;;
         "sa-saopaulo-1") echo "BRT|UTC-3|4am-9am BRT 低使用率" ;;
-        *) echo "SGT|UTC+8|10am-3pm 工作日低使用率" ;;
+        *) echo "PST|UTC-8|5am-10am PT 低使用率" ;;
     esac
 }
 
 # Get optimal schedule for current region
 get_regional_schedule() {
-    local region="${OCI_REGION:-ap-singapore-1}"
+    local region="${OCI_REGION:-us-sanjose-1}"
     local pattern=$(get_regional_pattern "$region")
     
     echo "$pattern"
@@ -38,7 +38,7 @@ get_regional_schedule() {
 
 # Generate optimized cron patterns based on region
 generate_cron_patterns() {
-    local region="${OCI_REGION:-ap-singapore-1}"
+    local region="${OCI_REGION:-us-sanjose-1}"
     
     log_info "正在为区域生成优化的 cron 模式: $region"
     
@@ -72,6 +72,16 @@ generate_cron_patterns() {
             echo "# Peak conservative: 13-5 UTC (8am-12am EST - avoid business/evening)"
             echo 'schedule_conservative: "0 13-23,0-5 * * *"'
             echo 'schedule_weekend: "*/20 6-11 * * 6,0"'
+            ;;
+            
+        # US West (San Jose/Phoenix): Business hours 9am-6pm PST = 5pm-2am UTC
+        "us-sanjose-1"|"us-phoenix-1")
+            echo "# US West-optimized schedule"
+            echo "# Off-peak aggressive: 13-20 UTC (5am-12pm PST - morning low)"
+            echo 'schedule_aggressive: "*/15 13-20 * * *"'
+            echo "# Peak conservative: 21-12 UTC (1pm-4am PST - avoid business/evening)"
+            echo 'schedule_conservative: "0 21-23,0-12 * * *"'
+            echo 'schedule_weekend: "*/20 13-19 * * 6,0"'
             ;;
             
         # Europe: Business hours 9am-6pm CET = 8am-5pm UTC

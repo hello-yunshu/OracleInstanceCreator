@@ -132,16 +132,16 @@ REGION_SUFFIX=$(get_region_suffix)
 # Shape configurations for Oracle Cloud free tier
 # shellcheck disable=SC2034  # Used via nameref in launch_shape()
 declare -A A1_FLEX_CONFIG=(
-    ["SHAPE"]="VM.Standard.A1.Flex"
-    ["OCPUS"]="4"
-    ["MEMORY_IN_GBS"]="24"
+    ["SHAPE"]="$A1_FLEX_SHAPE"
+    ["OCPUS"]="$A1_FLEX_OCPUS"
+    ["MEMORY_IN_GBS"]="$A1_FLEX_MEMORY_GB"
     ["DISPLAY_NAME"]="a1-flex-${REGION_SUFFIX}"
     ["BOOT_VOLUME_ID"]="${A1_BOOT_VOLUME_ID:-${BOOT_VOLUME_ID:-}}"
 )
 
 # shellcheck disable=SC2034  # Used via nameref in launch_shape()
 declare -A E2_MICRO_CONFIG=(
-    ["SHAPE"]="VM.Standard.E2.1.Micro"
+    ["SHAPE"]="$E2_MICRO_SHAPE"
     ["OCPUS"]=""
     ["MEMORY_IN_GBS"]=""
     ["DISPLAY_NAME"]="e2-micro-${REGION_SUFFIX}"

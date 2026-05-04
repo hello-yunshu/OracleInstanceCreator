@@ -233,6 +233,7 @@ oci_cmd_data() {
     oci_args+=("--no-retry")
     oci_args+=("--connection-timeout" "${OCI_CONNECTION_TIMEOUT_SECONDS:-5}")
     oci_args+=("--read-timeout" "${OCI_READ_TIMEOUT_SECONDS:-15}")
+
     
     log_debug "执行 OCI 数据命令: oci ${oci_args[*]} ${cmd[*]}"
     
