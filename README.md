@@ -54,6 +54,10 @@
 | `OCI_COMPARTMENT_ID` | ❌ | 隔离舱 OCID（默认使用租户 OCID） |
 | `OCI_IMAGE_ID` | ❌ | 自定义镜像 OCID（默认自动查询最新镜像） |
 | `OCI_PROXY_URL` | ❌ | 代理 URL（支持 IPv4/IPv6） |
+| `OCI_AD` | ❌ | 可用域（默认 `fgaj:AP-SINGAPORE-1-AD-1`） |
+| `OCI_REGION_TIMEZONE` | ❌ | 区域时区（默认 `Asia/Singapore`） |
+| `OCI_BOOT_VOLUME_ID` | ❌ | 通用引导卷 OCID（留空则创建新引导卷） |
+| `OCI_A1_BOOT_VOLUME_ID` | ❌ | A1.Flex 专用引导卷 OCID（留空则创建新引导卷） |
 
 ### 3. 启用 GitHub Actions
 

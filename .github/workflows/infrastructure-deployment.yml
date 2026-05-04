@@ -2,87 +2,87 @@
 permissions:
   contents: read
   actions: write
-name: 'OCI Orchestrator - Infrastructure Deployment'
+name: 'OCI 编排器 - 基础设施部署'
 
 on:
   # schedule:
-    # 四层优化策略: 10-min off-peak weekdays, 15-min peak weekdays, 10-min all weekend (~4,320 runs/month)
-    # All schedules target Oracle Cloud optimal availability windows for maximum deployment success
+    # 四层优化策略: 10分钟非高峰工作日, 15分钟高峰工作日, 10分钟全天周末 (~4,320 次/月)
+    # 所有调度目标为 Oracle Cloud 最佳可用性窗口
 
-    # 第一层: 非高峰激进策略 (10-min intervals) - Weekdays only
-    # UTC 2-7am = SGT 10am-3pm (lunch/afternoon lull)
-    # UTC 2-7am = EST 9pm-2am (late evening/night)
-    # UTC 2-7am = CET 3-8am (early morning)
+    # 第一层: 非高峰激进策略 (10分钟间隔) - 仅工作日
+    # UTC 2-7am = SGT 10am-3pm (午休/下午低谷)
+    # UTC 2-7am = EST 9pm-2am (深夜)
+    # UTC 2-7am = CET 3-8am (清晨)
     # - cron: "*/10 2-7 * * 1-5"
 
-    # TIER 2: Late night/early morning (10-min intervals) - Weekdays only
-    # UTC 20-23 = SGT 4am-7am (early morning low usage, avoids overlap with TIER 1)
+    # 第二层: 深夜/凌晨 (10分钟间隔) - 仅工作日
+    # UTC 20-23 = SGT 4am-7am (清晨低使用率，避免与第一层重叠)
     # - cron: "*/10 20-23 * * 1-5"
 
-    # TIER 3: Peak hours conservative (15-min intervals) - Weekdays only
-    # UTC 8-19 = SGT 4pm-3am (business end + evening peak)
+    # 第三层: 高峰时段保守策略 (15分钟间隔) - 仅工作日
+    # UTC 8-19 = SGT 4pm-3am (工作结束 + 晚间高峰)
     # - cron: "*/15 8-19 * * 1-5"
 
-    # TIER 4: Weekend boost (10-min intervals all day)
-    # Saturdays and Sundays - lower weekend cloud usage, no overlap with weekday tiers
+    # 第四层: 周末增强 (10分钟间隔全天)
+    # 周六和周日 - 周末云使用率较低，不与工作日层级重叠
     # - cron: "*/10 * * * 6,0"
 
-  # Disabled to avoid triggering 429 on OCI API; also failures confuse claude when trying to fix PR checks
+  # 已禁用，避免触发 OCI API 429；失败也会干扰 claude 修复 PR 检查
   # pull_request:
   #  types: [opened, synchronize, ready_for_review, reopened]
 
   workflow_dispatch:
     inputs:
       oci_cli_debug:
-        description: 'Enable OCI CLI --debug flag (verbose Oracle API request/response logs)'
+        description: '启用 OCI CLI --debug 标志（详细 Oracle API 请求/响应日志）'
         type: boolean
         default: false
       internal_debug:
-        description: 'Enable internal script debug logging (execution flow, decisions, state changes)'
+        description: '启用内部脚本调试日志（执行流程、决策、状态变更）'
         type: boolean
         default: true
       send_notifications:
-        description: 'Send Telegram notifications'
+        description: '发送 Telegram 通知'
         type: boolean
         default: true
       check_existing_instance:
-        description: 'Check for existing instance before launch'
+        description: '启动前检查已有实例'
         type: boolean
         default: true
       reset_success_state:
-        description: 'Reset INSTANCE_CREATED variable to allow new attempts'
+        description: '重置 INSTANCE_CREATED 变量以允许新尝试'
         type: boolean
         default: false
       adaptive_scheduling:
-        description: 'Enable adaptive scheduling based on success patterns'
+        description: '启用基于成功模式的自适应调度'
         type: boolean
         default: true
       region_optimization:
-        description: 'Use region-specific timing optimization'
+        description: '使用区域特定的时间优化'
         type: boolean
         default: true
 
-# Prevent multiple workflow runs from overlapping to avoid billing spikes
+# 防止多个工作流运行重叠以避免计费激增
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
 env:
-  # Global environment variables - Dual debug flag support
+  # 全局环境变量 - 双调试标志支持
   OCI_CLI_DEBUG: ${{ inputs.oci_cli_debug && 'true' || 'false' }}
   INTERNAL_DEBUG: ${{ github.event_name == 'workflow_dispatch' && (inputs.internal_debug && 'true' || 'false') || 'true' }}
   ENABLE_NOTIFICATIONS: ${{ github.event_name == 'workflow_dispatch' && (inputs.send_notifications && 'true' || 'false') || 'true' }}
-  # Enable instance check by default to use state management cache (can be overridden manually)
+  # 默认启用实例检查以使用状态管理缓存（可手动覆盖）
   CHECK_EXISTING_INSTANCE: ${{ github.event_name == 'workflow_dispatch' && (inputs.check_existing_instance && 'true' || 'false') || 'true' }}
-  # Suppress OCI CLI file permissions warnings
+  # 抑制 OCI CLI 文件权限警告
   OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: true
 
 jobs:
   create-instance:
-    # Skip execution if instance already created (unless manually reset)
+    # 如果实例已创建则跳过（除非手动重置）
     if: ${{ github.event.repository.vars.INSTANCE_CREATED != 'true' || inputs.reset_success_state }}
     runs-on: ubuntu-latest
-    name: Deploy OCI Infrastructure (Parallel Orchestration)
+    name: 部署 OCI 基础设施（并行编排）
     permissions:
       contents: read
     outputs:
@@ -93,18 +93,20 @@ jobs:
       # 新加坡: "fgaj:AP-SINGAPORE-1-AD-1"
       # 圣何塞: "AxQf:US-SANJOSE-1-AD-1"
       # 阿什本: "oGHu:US-ASHBURN-1-AD-1,oGHu:US-ASHBURN-1-AD-2,oGHu:US-ASHBURN-1-AD-3"
-      OCI_AD: "fgaj:AP-SINGAPORE-1-AD-1"
-      OCI_SHAPE: "VM.Standard.A1.Flex"  # Default shape for validation (overridden per-shape)
-      OCI_OCPUS: "4"  # Default for A1.Flex validation (overridden per-shape)
-      OCI_MEMORY_IN_GBS: "24"  # Default for A1.Flex validation (overridden per-shape)
-      INSTANCE_DISPLAY_NAME: "default-instance"  # Default for validation (overridden per-shape)
+      # 也可通过 Secret OCI_AD 覆盖
+      OCI_AD: ${{ secrets.OCI_AD || 'fgaj:AP-SINGAPORE-1-AD-1' }}
+      OCI_SHAPE: "VM.Standard.A1.Flex"
+      OCI_OCPUS: "4"
+      OCI_MEMORY_IN_GBS: "24"
+      INSTANCE_DISPLAY_NAME: "default-instance"
       ASSIGN_PUBLIC_IP: "false"
       OPERATING_SYSTEM: "Oracle Linux"
       OS_VERSION: "10"
       # 引导卷配置
       BOOT_VOLUME_SIZE: "50"
-      BOOT_VOLUME_ID: ""  # Set to an existing boot volume OCID to attach instead of creating new
-      A1_BOOT_VOLUME_ID: ""  # Boot volume OCID specifically for A1.Flex shape
+      # 引导卷 ID 从 Secrets 读取，留空则创建新引导卷
+      BOOT_VOLUME_ID: ${{ secrets.OCI_BOOT_VOLUME_ID || '' }}
+      A1_BOOT_VOLUME_ID: ${{ secrets.OCI_A1_BOOT_VOLUME_ID || '' }}
       # 实例恢复和兼容性设置
       RECOVERY_ACTION: "RESTORE_INSTANCE"
       LEGACY_IMDS_ENDPOINTS: "false"
@@ -126,27 +128,27 @@ jobs:
       ENABLE_ADAPTIVE_SCHEDULING: ${{ inputs.adaptive_scheduling && 'true' || 'false' }}
       ENABLE_REGION_OPTIMIZATION: ${{ inputs.region_optimization && 'true' || 'false' }}
       # 区域时区（新加坡: Asia/Singapore, 圣何塞: America/Los_Angeles, 阿什本: America/New_York）
-      ORACLE_REGION_TIMEZONE: "Asia/Singapore"
+      # 也可通过 Secret OCI_REGION_TIMEZONE 覆盖
+      ORACLE_REGION_TIMEZONE: ${{ secrets.OCI_REGION_TIMEZONE || 'Asia/Singapore' }}
       SUCCESS_TRACKING_ENABLED: "true"
     steps:
-      - name: Checkout repository
+      - name: 检出仓库
         uses: actions/checkout@v5
 
-      - name: Get current date for cache key
+      - name: 获取当前日期（缓存键）
         id: get-date
         run: echo "date=$(date '+%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
-      - name: Generate cache key with region hash
+      - name: 生成缓存键（含区域哈希）
         id: cache-key
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
         run: |
-          # Generate region hash to match state-manager.sh logic
           region_hash=$(echo -n "$OCI_REGION" | sha256sum | cut -d' ' -f1 | head -c 8)
           echo "key=oci-instances-${region_hash}-v1-${{ steps.get-date.outputs.date }}" >> "$GITHUB_OUTPUT"
           echo "prefix=oci-instances-${region_hash}-v1-" >> "$GITHUB_OUTPUT"
 
-      - name: Restore instance state cache
+      - name: 恢复实例状态缓存
         id: cache-instance-state
         uses: actions/cache/restore@v4.2.4
         with:
@@ -156,42 +158,39 @@ jobs:
             ${{ steps.cache-key.outputs.prefix }}
             oci-instances-
 
-      - name: Initialize state manager
+      - name: 初始化状态管理器
         env:
           CACHE_ENABLED: "true"
           CACHE_TTL_HOURS: "24"
           CACHE_DATE_KEY: ${{ steps.get-date.outputs.date }}
         run: |
-          # Make state manager executable
           chmod +x scripts/state-manager.sh
-          # Initialize state management system
           ./scripts/state-manager.sh init
-          # Show current state for debugging
           if [[ "$INTERNAL_DEBUG" == "true" ]]; then
             ./scripts/state-manager.sh print
           fi
 
-      - name: Reset success state if requested
+      - name: 重置成功状态（如已请求）
         if: inputs.reset_success_state
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Resetting INSTANCE_CREATED variable to allow new deployment attempts"
+          echo "正在重置 INSTANCE_CREATED 变量以允许新的部署尝试"
           gh variable set INSTANCE_CREATED --body "false" || true
           gh variable delete INSTANCE_CREATED_INFO 2>/dev/null || true
           gh variable delete SUCCESS_PATTERN_DATA 2>/dev/null || true
-          echo "Success state and pattern tracking reset completed"
+          echo "成功状态和模式追踪已重置"
 
-      - name: Adaptive Scheduling Intelligence
+      - name: 自适应调度分析
         if: env.ENABLE_ADAPTIVE_SCHEDULING == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/adaptive-scheduler.sh
 
-      - name: Create requirements file
+      - name: 创建依赖文件
         run: echo "oci-cli" > requirements.txt
 
-      - name: Setup Python
+      - name: 配置 Python 环境
         uses: actions/setup-python@v5.6.0
         id: setup-python
         with:
@@ -199,7 +198,7 @@ jobs:
           check-latest: false
           update-environment: true
 
-      - name: Cache pip dependencies
+      - name: 缓存 pip 依赖
         uses: actions/cache@v4.2.4
         with:
           path: |
@@ -210,10 +209,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-pip-
 
-      - name: Install OCI CLI
+      - name: 安装 OCI CLI
         run: pip install --user -r requirements.txt
 
-      - name: Production preflight check
+      - name: 生产环境预检
         env:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
           OCI_KEY_FINGERPRINT: ${{ secrets.OCI_KEY_FINGERPRINT }}
@@ -229,7 +228,7 @@ jobs:
           TELEGRAM_USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
         run: ./scripts/preflight-check.sh
 
-      - name: Setup OCI and SSH configuration (parallel)
+      - name: 配置 OCI 和 SSH（并行）
         env:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
           OCI_KEY_FINGERPRINT: ${{ secrets.OCI_KEY_FINGERPRINT }}
@@ -239,32 +238,29 @@ jobs:
           OCI_PROXY_URL: ${{ secrets.OCI_PROXY_URL }}
           INSTANCE_SSH_PUBLIC_KEY: ${{ secrets.INSTANCE_SSH_PUBLIC_KEY }}
         run: |
-          # Run setup scripts in parallel for faster execution
           ./scripts/setup-oci.sh &
           ./scripts/setup-ssh.sh &
           wait
 
-      - name: Pre-Launch Debug Info
+      - name: 启动前调试信息
         if: env.INTERNAL_DEBUG == 'true'
         run: |
-          echo "=== PRE-LAUNCH DEBUG INFO ==="
-          echo "Workflow: ${{ github.workflow }}"
-          echo "Run ID: ${{ github.run_id }}"
-          echo "Event: ${{ github.event_name }}"
-          echo "Branch: ${{ github.ref_name }}"
+          echo "=== 启动前调试信息 ==="
+          echo "工作流: ${{ github.workflow }}"
+          echo "运行 ID: ${{ github.run_id }}"
+          echo "事件: ${{ github.event_name }}"
+          echo "分支: ${{ github.ref_name }}"
           echo "OCI_CLI_DEBUG: $OCI_CLI_DEBUG"
           echo "INTERNAL_DEBUG: $INTERNAL_DEBUG"
           echo "ENABLE_NOTIFICATIONS: $ENABLE_NOTIFICATIONS"
-          echo "Current directory: $(pwd)"
-          echo "Available scripts:"
+          echo "当前目录: $(pwd)"
+          echo "可用脚本:"
           ls -la scripts/
-          echo "launch-parallel.sh permissions:"
+          echo "launch-parallel.sh 权限:"
           ls -la scripts/launch-parallel.sh
-          echo "Shell options before execution:"
-          set +x || true  # Don't fail if -x not set
-          echo "=== END PRE-LAUNCH DEBUG ==="
+          echo "=== 调试信息结束 ==="
 
-      - name: Launch OCI Instances (Parallel)
+      - name: 启动 OCI 实例（并行）
         id: launch-instances
         env:
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
@@ -279,69 +275,59 @@ jobs:
           CACHE_TTL_HOURS: "24"
           CACHE_DATE_KEY: ${{ steps.get-date.outputs.date }}
         run: |
-          # CRITICAL: This step MUST NOT fail on expected Oracle responses
-          # Expected responses (capacity/limits/rate limits) should return exit 0
-          # Only auth/config/system errors should return non-zero
-          #
-          # DEBUG FLAGS:
-          # - OCI_CLI_DEBUG: Controls --debug flag for Oracle API request/response logging
-          # - INTERNAL_DEBUG: Controls internal script logging and workflow debug steps
+          # 关键: 此步骤不得因预期的 Oracle 响应而失败
+          # 预期响应（容量/限制/速率限制）应返回退出码 0
+          # 仅认证/配置/系统错误应返回非零
           
           echo "=== 启动 OCI 实例（并行）==="
-          echo "Timestamp: $(date -Iseconds)"
+          echo "时间戳: $(date -Iseconds)"
           
-          # Execute with explicit exit code capture and debugging
           set -euo pipefail
           script_exit_code=0
           
-          # Run the script and capture its exit code
           ./scripts/launch-parallel.sh || script_exit_code=$?
           
-          echo "=== LAUNCH SCRIPT COMPLETED ==="
-          echo "Script exit code: $script_exit_code"
-          echo "Timestamp: $(date -Iseconds)"
+          echo "=== 启动脚本执行完成 ==="
+          echo "脚本退出码: $script_exit_code"
+          echo "时间戳: $(date -Iseconds)"
           
-          # Log exit code interpretation for debugging
           case $script_exit_code in
-            0) echo "SUCCESS: Instance creation succeeded or expected Oracle constraints encountered" ;;
-            1) echo "FAILURE: General error or authentication/configuration issue" ;;
-            2) echo "SUCCESS: Oracle capacity constraint (expected, will retry on schedule)" ;;  
-            5) echo "SUCCESS: User limit reached (expected free tier behavior)" ;;
-            6) echo "SUCCESS: Rate limit encountered (expected Oracle API behavior)" ;;
-            124) echo "TIMEOUT: Script execution timeout" ;;
-            *) echo "UNKNOWN: Unexpected exit code $script_exit_code" ;;
+            0) echo "成功: 实例创建成功或遇到预期的 Oracle 约束" ;;
+            1) echo "失败: 一般错误或认证/配置问题" ;;
+            2) echo "成功: Oracle 容量约束（预期行为，将按计划重试）" ;;
+            5) echo "成功: 用户限制已达（预期免费层行为）" ;;
+            6) echo "成功: 遇到速率限制（预期 Oracle API 行为）" ;;
+            124) echo "超时: 脚本执行超时" ;;
+            *) echo "未知: 意外的退出码 $script_exit_code" ;;
           esac
           
-          # Workflow success logic: Only fail on genuine errors (not expected Oracle responses)
           if [[ $script_exit_code -eq 0 || $script_exit_code -eq 2 || $script_exit_code -eq 5 || $script_exit_code -eq 6 ]]; then
-            echo "WORKFLOW SUCCESS: Exit code $script_exit_code indicates expected behavior"
-            # Store exit code for post-launch debug step
+            echo "工作流成功: 退出码 $script_exit_code 表示预期行为"
             echo "script_exit_code=$script_exit_code" >> $GITHUB_OUTPUT
-            exit 0  # Ensure workflow step succeeds for expected scenarios
+            exit 0
           else
-            echo "WORKFLOW FAILURE: Exit code $script_exit_code indicates genuine failure"
+            echo "工作流失败: 退出码 $script_exit_code 表示真实失败"
             echo "script_exit_code=$script_exit_code" >> $GITHUB_OUTPUT
-            exit $script_exit_code  # Propagate actual failure
+            exit $script_exit_code
           fi
 
-      - name: Post-Launch Debug Info
+      - name: 启动后调试信息
         if: always() && env.INTERNAL_DEBUG == 'true'
         run: |
-          echo "=== POST-LAUNCH DEBUG INFO ==="
-          echo "Step conclusion: ${{ steps.launch-instances.conclusion }}"
-          echo "Script exit code: ${{ steps.launch-instances.outputs.script_exit_code }}"
-          echo "Workflow job status: ${{ job.status }}"
-          echo "Timestamp: $(date -Iseconds)"
+          echo "=== 启动后调试信息 ==="
+          echo "步骤结果: ${{ steps.launch-instances.conclusion }}"
+          echo "脚本退出码: ${{ steps.launch-instances.outputs.script_exit_code }}"
+          echo "工作流状态: ${{ job.status }}"
+          echo "时间戳: $(date -Iseconds)"
           
-          # Show any cached state for debugging
           if [[ -d .cache/oci-state ]]; then
-            echo "OCI state cache contents:"
+            echo "OCI 状态缓存内容:"
             find .cache/oci-state -type f -exec echo "  {}: $(cat {})" \;
           fi
           
-          echo "=== END POST-LAUNCH DEBUG ==="
+          echo "=== 调试信息结束 ==="
 
-      - name: Verify instances and update state
+      - name: 验证实例并更新状态
         if: always()
         env:
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
@@ -350,20 +336,19 @@ jobs:
           CACHE_TTL_HOURS: "24"
           CACHE_DATE_KEY: ${{ steps.get-date.outputs.date }}
         run: |
-          # Verify actual instance state via OCI API and update cache
-          echo "Verifying instance state and updating cache..."
+          echo "正在验证实例状态并更新缓存..."
           if [[ "$INTERNAL_DEBUG" == "true" ]]; then
             ./scripts/state-manager.sh print
           fi
 
-      - name: Save instance state cache
+      - name: 保存实例状态缓存
         if: always()
         uses: actions/cache/save@v4.2.4
         with:
           path: .cache/oci-state
           key: ${{ steps.cache-key.outputs.key }}
 
-      - name: Schedule Optimization Analysis
+      - name: 调度优化分析
         if: always() && env.ENABLE_ADAPTIVE_SCHEDULING == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -372,37 +357,32 @@ jobs:
 
   notify-on-genuine-failure:
     runs-on: ubuntu-latest
-    name: Send Failure Notification (Genuine Errors Only)
+    name: 发送失败通知（仅真实错误）
     needs: create-instance
-    # CRITICAL LOGIC: Only notify on genuine failures, NOT on expected Oracle responses
-    # This job should NOT trigger since the main job now handles expected responses correctly
-    # If this job triggers, it indicates a real authentication/configuration/system failure
+    # 关键逻辑: 仅在真实失败时通知，不在预期 Oracle 响应时通知
     if: failure()
     steps:
-      - name: Checkout repository
+      - name: 检出仓库
         uses: actions/checkout@v5
 
-      - name: Debug Failure Analysis
+      - name: 调试失败分析
         run: |
-          echo "=== GENUINE FAILURE DETECTED ==="
-          echo "This notification job should NOT trigger for capacity/limit/rate limit responses"
-          echo "If this job is running, it indicates a real system/auth/config failure"
-          echo "Job status: ${{ needs.create-instance.result }}"
-          echo "Script exit code: ${{ needs.create-instance.outputs.script_exit_code }}"
-          echo "Timestamp: $(date -Iseconds)"
-          echo "=== ANALYSIS COMPLETE ==="
+          echo "=== 检测到真实失败 ==="
+          echo "此通知任务不应因容量/限制/速率限制响应而触发"
+          echo "如果此任务正在运行，说明存在真实的系统/认证/配置失败"
+          echo "任务状态: ${{ needs.create-instance.result }}"
+          echo "脚本退出码: ${{ needs.create-instance.outputs.script_exit_code }}"
+          echo "时间戳: $(date -Iseconds)"
+          echo "=== 分析完成 ==="
 
-      - name: Send genuine failure notification
+      - name: 发送真实失败通知
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
         run: |
-          # Only send notifications if enabled
           if [[ "$ENABLE_NOTIFICATIONS" == "true" ]]; then
             source scripts/notify.sh
-            
-            # Enhanced failure notification with context  
-            notify_workflow_completed "failed" "🚨 OCI Workflow Genuine Failure - Run ID: ${{ github.run_id }} - This is NOT a capacity/limit issue but indicates real auth/config problems requiring attention."
+            notify_workflow_completed "failed" "🚨 OCI 工作流真实失败 - 运行 ID: ${{ github.run_id }} - 这不是容量/限制问题，而是需要关注的真实认证/配置问题。"
           else
-            echo "Notifications disabled - would have sent genuine failure alert"
+            echo "通知已禁用 - 本应发送真实失败警报"
           fi
