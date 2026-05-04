@@ -59,6 +59,7 @@
 | `OCI_BOOT_VOLUME_ID` | ❌ | 通用引导卷 OCID（形状专用 ID 未设置时回退使用） |
 | `OCI_A1_BOOT_VOLUME_ID` | ❌ | A1.Flex 专用引导卷 OCID（优先于通用 ID） |
 | `OCI_E2_BOOT_VOLUME_ID` | ❌ | E2.Micro 专用引导卷 OCID（优先于通用 ID） |
+| `SKIP_SHAPES` | ❌ | 跳过指定形状（默认 `E2` 只申请 A1，设为 `A1` 只申请 E2，留空申请全部） |
 
 ### 3. 启用 GitHub Actions
 
@@ -231,6 +232,7 @@
 | `OCI_MEMORY_IN_GBS` | `24` | 内存 GB（仅 Flex 形状） |
 | `BOOT_VOLUME_SIZE` | `50` | 引导卷大小（GB，最低 50） |
 | `ASSIGN_PUBLIC_IP` | `true` | 是否分配公网 IP |
+| `SKIP_SHAPES` | `E2` | 跳过指定形状（`E2` 只申请 A1，`A1` 只申请 E2，留空申请全部） |
 | `RECOVERY_ACTION` | `RESTORE_INSTANCE` | 实例恢复策略 |
 
 ### 重试配置
