@@ -210,16 +210,16 @@ provide_scheduling_recommendations() {
     # Regional optimization advice
     case "${OCI_REGION:-}" in
         *"ap-singapore"*)
-            log_info "REGIONAL TIP: Singapore region - current UTC 2-7am window targets SGT business off-hours"
+            log_info "区域提示: 新加坡区域 - 当前 UTC 2-7am 窗口针对 SGT 非工作时间"
             ;;
-        *"us-"*)
-            log_info "REGIONAL TIP: US region - consider adjusting for US business hours (UTC +4-8 offset)"
+        *"us-ashburn"*|*"us-phoenix"*|*"us-sanjose"*)
+            log_info "区域提示: 美国区域 - 建议调整至美国非工作时间（UTC +4-8 偏移）"
             ;;
         *"eu-"*)
-            log_info "REGIONAL TIP: EU region - consider adjusting for European business hours (UTC +0-2 offset)"
+            log_info "区域提示: 欧洲区域 - 建议调整至欧洲非工作时间（UTC +0-2 偏移）"
             ;;
         *)
-            log_info "REGIONAL TIP: Unknown region - verify optimal time windows for your location"
+            log_info "区域提示: 未知区域 - 请验证您所在位置的最佳时间窗口"
             ;;
     esac
     

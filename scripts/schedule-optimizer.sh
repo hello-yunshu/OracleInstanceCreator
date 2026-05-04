@@ -11,19 +11,20 @@ source "$(dirname "$0")/utils.sh"
 get_regional_pattern() {
     local region="$1"
     case "$region" in
-        "ap-singapore-1") echo "SGT|UTC+8|10am-3pm weekdays low usage" ;;
-        "ap-mumbai-1") echo "IST|UTC+5:30|2pm-5pm weekdays low usage" ;;
-        "ap-sydney-1") echo "AEDT|UTC+11|7am-12pm weekdays low usage" ;;
-        "ap-tokyo-1") echo "JST|UTC+9|11am-4pm weekdays low usage" ;;
-        "us-east-1") echo "EST|UTC-5|2am-7am ET low usage" ;;
-        "us-west-1") echo "PST|UTC-8|5am-10am PT low usage" ;;
-        "us-west-2") echo "PST|UTC-8|5am-10am PT low usage" ;;
-        "eu-frankfurt-1") echo "CET|UTC+1|8am-1pm CET low usage" ;;
-        "eu-london-1") echo "GMT|UTC+0|7am-12pm GMT low usage" ;;
-        "eu-amsterdam-1") echo "CET|UTC+1|8am-1pm CET low usage" ;;
-        "ca-central-1") echo "EST|UTC-5|2am-7am ET low usage" ;;
-        "sa-saopaulo-1") echo "BRT|UTC-3|4am-9am BRT low usage" ;;
-        *) echo "SGT|UTC+8|10am-3pm weekdays low usage" ;;  # Default to Singapore
+        "ap-singapore-1") echo "SGT|UTC+8|10am-3pm 工作日低使用率" ;;
+        "ap-mumbai-1") echo "IST|UTC+5:30|2pm-5pm 工作日低使用率" ;;
+        "ap-sydney-1") echo "AEDT|UTC+11|7am-12pm 工作日低使用率" ;;
+        "ap-tokyo-1") echo "JST|UTC+9|11am-4pm 工作日低使用率" ;;
+        "ap-seoul-1") echo "KST|UTC+9|11am-4pm 工作日低使用率" ;;
+        "us-ashburn-1") echo "EST|UTC-5|2am-7am ET 低使用率" ;;
+        "us-phoenix-1") echo "PST|UTC-8|5am-10am PT 低使用率" ;;
+        "us-sanjose-1") echo "PST|UTC-8|5am-10am PT 低使用率" ;;
+        "eu-frankfurt-1") echo "CET|UTC+1|8am-1pm CET 低使用率" ;;
+        "uk-london-1") echo "GMT|UTC+0|7am-12pm GMT 低使用率" ;;
+        "eu-amsterdam-1") echo "CET|UTC+1|8am-1pm CET 低使用率" ;;
+        "ca-toronto-1") echo "EST|UTC-5|2am-7am ET 低使用率" ;;
+        "sa-saopaulo-1") echo "BRT|UTC-3|4am-9am BRT 低使用率" ;;
+        *) echo "SGT|UTC+8|10am-3pm 工作日低使用率" ;;
     esac
 }
 

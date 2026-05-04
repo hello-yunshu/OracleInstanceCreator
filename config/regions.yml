@@ -75,9 +75,15 @@ regions:
     free_tier_available: true
 
   ca-toronto-1:
-    name: "Canada Southeast (Toronto)"
+    name: "加拿大东南（多伦多）"
     availability_domains:
       - "YnyK:CA-TORONTO-1-AD-1"
+    free_tier_available: true
+
+  us-sanjose-1:
+    name: "美西（圣何塞）"
+    availability_domains:
+      - "AxQf:US-SANJOSE-1-AD-1"
     free_tier_available: true
 
   # South America regions

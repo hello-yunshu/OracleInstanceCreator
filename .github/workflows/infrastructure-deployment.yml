@@ -90,7 +90,9 @@ jobs:
     env:
       # 两种形状的通用配置
       # 多 AD 支持: 使用逗号分隔的列表指定多个 AD
-      # Example: "fgaj:AP-SINGAPORE-1-AD-1,fgaj:AP-SINGAPORE-1-AD-2,fgaj:AP-SINGAPORE-1-AD-3"
+      # 新加坡: "fgaj:AP-SINGAPORE-1-AD-1"
+      # 圣何塞: "AxQf:US-SANJOSE-1-AD-1"
+      # 阿什本: "oGHu:US-ASHBURN-1-AD-1,oGHu:US-ASHBURN-1-AD-2,oGHu:US-ASHBURN-1-AD-3"
       OCI_AD: "fgaj:AP-SINGAPORE-1-AD-1"
       OCI_SHAPE: "VM.Standard.A1.Flex"  # Default shape for validation (overridden per-shape)
       OCI_OCPUS: "4"  # Default for A1.Flex validation (overridden per-shape)
@@ -116,12 +118,14 @@ jobs:
       INSTANCE_VERIFY_DELAY: "30"
       # 日志配置（设为 'json' 启用结构化日志）
       LOG_FORMAT: "text"
-      # 缓存镜像 ID（需定期更新）
+      # 缓存镜像 ID（需定期更新，以下为新加坡区域镜像）
+      # 切换区域时需更新为对应区域的镜像 OCID，或留空让脚本自动查询
       OCI_CACHED_OL10_ARM_IMAGE: "ocid1.image.oc1.ap-singapore-1.aaaaaaaay4vc5rcekxthq7cillis3qred5xyz7kmqd6wuaoknk4zukohqlua"
       OCI_CACHED_OL10_AMD_IMAGE: "ocid1.image.oc1.ap-singapore-1.aaaaaaaaitll52n3sr73g2gaclby2ph5whrmb5l3tbo47i6atle6z3cemr6a"
       # 自适应调度配置
       ENABLE_ADAPTIVE_SCHEDULING: ${{ inputs.adaptive_scheduling && 'true' || 'false' }}
       ENABLE_REGION_OPTIMIZATION: ${{ inputs.region_optimization && 'true' || 'false' }}
+      # 区域时区（新加坡: Asia/Singapore, 圣何塞: America/Los_Angeles, 阿什本: America/New_York）
       ORACLE_REGION_TIMEZONE: "Asia/Singapore"
       SUCCESS_TRACKING_ENABLED: "true"
     steps:
