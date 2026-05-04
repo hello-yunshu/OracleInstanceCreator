@@ -870,7 +870,7 @@ launch_oci_instance() {
 
     if [[ -n "${BOOT_VOLUME_ID:-}" ]]; then
         start_timer "boot_volume_detach"
-        detach_boot_volume_if_attached "$comp_id" "$BOOT_VOLUME_ID"
+        detach_boot_volume_if_attached "$comp_id" "$BOOT_VOLUME_ID" || log_warning "引导卷分离检查失败 - 继续尝试创建实例"
         log_elapsed "boot_volume_detach"
     fi
 

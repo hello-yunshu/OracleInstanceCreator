@@ -943,7 +943,7 @@ detach_boot_volume_if_attached() {
     
     if [[ -z "$boot_volume_id" ]]; then
         log_warning "未提供用于分离检查的引导卷 ID"
-        return 1
+        return 0
     fi
     
     local attachment_id
@@ -952,7 +952,7 @@ detach_boot_volume_if_attached() {
         --boot-volume-id "$boot_volume_id" \
         --lifecycle-state "ATTACHED" \
         --query 'data[0].id' \
-        --raw-output 2>/dev/null)
+        --raw-output 2>/dev/null || echo "")
     
     if [[ -z "$attachment_id" || "$attachment_id" == "null" ]]; then
         log_info "引导卷 $boot_volume_id 当前未附加 - 可以使用"
@@ -963,7 +963,7 @@ detach_boot_volume_if_attached() {
     attached_instance_id=$(oci_cmd compute boot-volume-attachment get \
         --boot-volume-attachment-id "$attachment_id" \
         --query 'data."instance-id"' \
-        --raw-output 2>/dev/null)
+        --raw-output 2>/dev/null || echo "")
     
     log_info "引导卷 $boot_volume_id 已附加到实例: ${attached_instance_id:-未知}"
     log_info "正在分离引导卷: $attachment_id"
@@ -971,13 +971,7 @@ detach_boot_volume_if_attached() {
     local detach_output
     detach_output=$(oci_cmd compute boot-volume-attachment detach \
         --boot-volume-attachment-id "$attachment_id" \
-        --force 2>&1)
-    local detach_status=$?
-    
-    if [[ $detach_status -ne 0 ]]; then
-        log_error "分离引导卷失败: $detach_output"
-        return 1
-    fi
+        --force 2>&1 || true)
     
     log_info "等待引导卷分离完成..."
     local max_wait=120
@@ -989,7 +983,7 @@ detach_boot_volume_if_attached() {
         state=$(oci_cmd compute boot-volume-attachment get \
             --boot-volume-attachment-id "$attachment_id" \
             --query 'data."lifecycle-state"' \
-            --raw-output 2>/dev/null)
+            --raw-output 2>/dev/null || echo "")
         
         if [[ -z "$state" || "$state" == "DETACHED" || "$state" == "null" ]]; then
             log_info "引导卷在 ${elapsed}s 后成功分离"
