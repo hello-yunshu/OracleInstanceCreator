@@ -84,8 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     name: 部署 OCI 基础设施（并行编排）
     permissions:
-      contents: read
-      variables: write
+      contents: write
     outputs:
       script_exit_code: ${{ steps.launch-instances.outputs.script_exit_code }}
     env:
