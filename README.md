@@ -67,18 +67,124 @@
 
 手动触发 **Infrastructure Deployment** 工作流。
 
+## 参数获取教程
+
+### 一、OCI 用户 OCID (`OCI_USER_OCID`)
+
+1. 登录 [Oracle Cloud 控制台](https://cloud.oracle.com)
+2. 点击右上角头像 → **我的个人资料**
+3. 在用户信息中找到 **OCID**，格式为 `ocid1.user.oc1..aaaa...`
+4. 点击复制
+
+### 二、租户 OCID (`OCI_TENANCY_OCID`)
+
+1. 登录 Oracle Cloud 控制台
+2. 点击右上角头像 → **租户设置**
+3. 找到 **OCID**，格式为 `ocid1.tenancy.oc1..aaaa...`
+4. 点击复制
+
+### 三、API 密钥指纹 (`OCI_KEY_FINGERPRINT`) 和私钥 (`OCI_PRIVATE_KEY`)
+
+1. 登录 Oracle Cloud 控制台
+2. 点击右上角头像 → **我的个人资料** → **API 密钥**
+3. 点击 **添加 API 密钥** → 选择 **下载私有密钥**
+   - 下载的 `.pem` 文件就是 `OCI_PRIVATE_KEY` 的值（完整粘贴，包括 `-----BEGIN RSA PRIVATE KEY-----` 和 `-----END RSA PRIVATE KEY-----`）
+4. 添加后页面会显示 **指纹**（fingerprint），格式如 `aa:bb:cc:dd:ee:ff:11:22:33:44:55:66:77:88:99:00`
+5. 这个指纹就是 `OCI_KEY_FINGERPRINT` 的值
+
+> **也可以用 OpenSSL 生成密钥对**：
+> ```bash
+> openssl genrsa -out oci_api_key.pem 2048
+> openssl rsa -pubout -out oci_api_key_public.pem
+> openssl dgst -sha256 -binary oci_api_key_public.pem | openssl base64 -A
+> ```
+> 然后在 OCI 控制台上传 `oci_api_key_public.pem` 的内容。
+
+### 四、区域标识 (`OCI_REGION`)
+
+1. 登录 Oracle Cloud 控制台
+2. 查看右上角的区域选择器，当前所在区域即为你的区域
+3. 常见区域标识：
+   - 圣何塞: `us-sanjose-1`
+   - 新加坡: `ap-singapore-1`
+   - 阿什本: `us-ashburn-1`
+   - 东京: `ap-tokyo-1`
+
+### 五、子网 OCID (`OCI_SUBNET_ID`)
+
+1. 登录 Oracle Cloud 控制台
+2. 导航到 **网络 → 虚拟云网络 (VCN)**
+3. 选择你的 VCN → 点击 **子网**
+4. 选择一个子网 → 复制 **OCID**，格式为 `ocid1.subnet.oc1..aaaa...`
+
+> **如果没有 VCN**：需要先创建一个 VCN（带 Internet Gateway），然后创建子网。在 VCN 创建向导中选择 **VCN + Internet Gateway** 即可自动创建。
+
+### 六、可用域 (`OCI_AD`)
+
+1. 登录 Oracle Cloud 控制台
+2. 导航到 **计算 → 实例** → **创建实例**
+3. 在可用域选择器中可以看到你的区域有哪些 AD
+4. 格式为 `前缀:区域-AD编号`，如 `AxQf:US-SANJOSE-1-AD-1`
+
+> **常见区域的 AD 值**：
+> | 区域 | AD 值 |
+> |------|-------|
+> | 圣何塞 | `AxQf:US-SANJOSE-1-AD-1` |
+> | 新加坡 | `fgaj:AP-SINGAPORE-1-AD-1` |
+> | 阿什本 | `oGHu:US-ASHBURN-1-AD-1` (有 AD-1/2/3) |
+
+### 七、SSH 公钥 (`INSTANCE_SSH_PUBLIC_KEY`)
+
+1. 生成 SSH 密钥对（如果已有可跳过）：
+   ```bash
+   ssh-keygen -t rsa -b 4096 -f ~/.ssh/oci_key -N ""
+   ```
+2. 公钥内容就是 `INSTANCE_SSH_PUBLIC_KEY` 的值：
+   ```bash
+   cat ~/.ssh/oci_key.pub
+   ```
+3. 复制完整输出（以 `ssh-rsa` 开头）
+
+### 八、Telegram Bot Token (`TELEGRAM_TOKEN`)
+
+1. 在 Telegram 中搜索 [@BotFather](https://t.me/BotFather)
+2. 发送 `/newbot`
+3. 输入 Bot 的显示名称（如 `OCI Monitor`）
+4. 输入 Bot 的用户名（必须以 `bot` 结尾，如 `oci_monitor_bot`）
+5. BotFather 会返回 Bot Token，格式如 `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`
+6. 复制这个 Token
+
+### 九、Telegram 用户 ID (`TELEGRAM_USER_ID`)
+
+1. 在 Telegram 中搜索 [@userinfobot](https://t.me/userinfobot)
+2. 发送任意消息
+3. Bot 会回复你的用户 ID，格式如 `123456789`
+4. 复制这个数字
+
+> **也可以用其他方式获取**：在 Telegram 中搜索 `@RawDataBot`，发送消息后它会返回包含你 `from.id` 的 JSON。
+
+### 十、引导卷 OCID (`OCI_A1_BOOT_VOLUME_ID`，可选)
+
+1. 登录 Oracle Cloud 控制台
+2. 导航到 **存储 → 块存储 → 引导卷**
+3. 找到你要迁移的引导卷 → 复制 **OCID**
+4. 格式为 `ocid1.bootvolume.oc1.区域.xxxxx`
+
+> **注意**：引导卷必须与新实例在同一个可用域中。如果旧实例在圣何塞 AD-1，新实例也必须在圣何塞 AD-1。
+
+---
+
 ## 配置说明
 
 ### 区域配置
 
-使用 `us-sanjose-1` 区域时，需要修改 `infrastructure-deployment.yml` 中的以下配置：
+使用 `us-sanjose-1` 区域时，在 GitHub Secrets 中添加以下配置：
 
-```yaml
-OCI_AD: "AxQf:US-SANJOSE-1-AD-1"
-ORACLE_REGION_TIMEZONE: "America/Los_Angeles"
-```
-
-同时将 `OCI_REGION` Secret 设置为 `us-sanjose-1`。
+| Secret | 值 |
+|--------|---|
+| `OCI_REGION` | `us-sanjose-1` |
+| `OCI_AD` | `AxQf:US-SANJOSE-1-AD-1` |
+| `OCI_REGION_TIMEZONE` | `America/Los_Angeles` |
 
 > **注意**：缓存镜像 ID 是区域专用的。切换区域时，将 `OCI_CACHED_OL10_ARM_IMAGE` 和 `OCI_CACHED_OL10_AMD_IMAGE` 留空，脚本会自动查询对应区域的最新镜像。
 
@@ -88,11 +194,11 @@ ORACLE_REGION_TIMEZONE: "America/Los_Angeles"
 
 1. 在 OCI 控制台终止旧实例时勾选 **"保留引导卷"**
 2. 获取引导卷的 OCID
-3. 在 `infrastructure-deployment.yml` 中设置：
+3. 在 GitHub Secrets 中添加：
 
-```yaml
-A1_BOOT_VOLUME_ID: "ocid1.bootvolume.oc1.us-sanjose-1.xxxxxx"
-```
+| Secret | 值 |
+|--------|---|
+| `OCI_A1_BOOT_VOLUME_ID` | `ocid1.bootvolume.oc1.us-sanjose-1.xxxxxx` |
 
 脚本会自动：
 - 跳过镜像查找（不需要新镜像）
@@ -171,26 +277,28 @@ OracleInstanceCreator/
 1. **Fork 本仓库**
 
 2. **配置 GitHub Secrets**：
-   - `OCI_REGION` = `us-sanjose-1`
-   - 其他 Secrets 按上表配置
 
-3. **修改工作流配置**：
-   
-   编辑 `.github/workflows/infrastructure-deployment.yml`：
-   ```yaml
-   OCI_AD: "AxQf:US-SANJOSE-1-AD-1"
-   ORACLE_REGION_TIMEZONE: "America/Los_Angeles"
-   # 清空缓存镜像 ID，让脚本自动查询
-   OCI_CACHED_OL10_ARM_IMAGE: ""
-   OCI_CACHED_OL10_AMD_IMAGE: ""
-   ```
+   | Secret | 值 |
+   |--------|---|
+   | `OCI_USER_OCID` | 你的用户 OCID |
+   | `OCI_KEY_FINGERPRINT` | API 密钥指纹 |
+   | `OCI_TENANCY_OCID` | 租户 OCID |
+   | `OCI_REGION` | `us-sanjose-1` |
+   | `OCI_PRIVATE_KEY` | API 私钥 |
+   | `OCI_SUBNET_ID` | 圣何塞子网 OCID |
+   | `INSTANCE_SSH_PUBLIC_KEY` | SSH 公钥 |
+   | `TELEGRAM_TOKEN` | Telegram Bot Token |
+   | `TELEGRAM_USER_ID` | Telegram 用户 ID |
+   | `OCI_AD` | `AxQf:US-SANJOSE-1-AD-1` |
+   | `OCI_REGION_TIMEZONE` | `America/Los_Angeles` |
 
-4. **（可选）配置引导卷迁移**：
-   ```yaml
-   A1_BOOT_VOLUME_ID: "ocid1.bootvolume.oc1.us-sanjose-1.xxxxxx"
-   ```
+3. **（可选）配置引导卷迁移**：
 
-5. **运行工作流**：手动触发 Infrastructure Deployment
+   | Secret | 值 |
+   |--------|---|
+   | `OCI_A1_BOOT_VOLUME_ID` | 旧引导卷 OCID |
+
+4. **运行工作流**：手动触发 Infrastructure Deployment
 
 ## License
 
