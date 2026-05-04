@@ -356,7 +356,7 @@ launch_instance() {
     if [[ -z "$available_ads_string" ]]; then
         log_warning "熔断器已过滤掉所有 AD - 均有过多近期失败"
     log_info "将在熔断器重置后重试"
-        return 0  # Treat as capacity issue - retry later
+        return "$OCI_EXIT_CAPACITY_ERROR"  # Treat as capacity issue - retry later
     fi
     
     local ad_list
@@ -472,7 +472,7 @@ launch_instance() {
                     continue
                 else
                     log_info "LimitExceeded 错误后所有 AD 已穷尽"
-                    return 0
+                    return "$OCI_EXIT_USER_LIMIT_ERROR"
                 fi
                 ;;
             "INTERNAL_ERROR"|"NETWORK")
@@ -549,7 +549,7 @@ launch_instance() {
                                 continue
                             else
                                 log_info "所有 AD 已穷尽 - 将在下次调度时重试"
-                                return 0
+                                return "$OCI_EXIT_CAPACITY_ERROR"
                             fi
                             ;;
                         "RATE_LIMIT")

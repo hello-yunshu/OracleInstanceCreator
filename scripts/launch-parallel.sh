@@ -709,6 +709,10 @@ main() {
     # Log results
     if [[ $STATUS_A1 -eq 0 ]]; then
         log_success "A1.Flex (ARM) 实例创建: 成功"
+    elif [[ $STATUS_A1 -eq $OCI_EXIT_CAPACITY_ERROR ]]; then
+        log_info "A1.Flex (ARM) 实例创建: 容量不足（将在下次调度时重试）"
+    elif [[ $STATUS_A1 -eq $OCI_EXIT_USER_LIMIT_ERROR ]]; then
+        log_info "A1.Flex (ARM) 实例创建: 已达用户限额"
     elif [[ $STATUS_A1 -eq 124 ]]; then
         log_warning "A1.Flex (ARM) 实例创建: 超时"
     else
@@ -717,6 +721,10 @@ main() {
 
     if [[ $STATUS_E2 -eq 0 ]]; then
         log_success "E2.1.Micro (AMD) 实例创建: 成功"
+    elif [[ $STATUS_E2 -eq $OCI_EXIT_CAPACITY_ERROR ]]; then
+        log_info "E2.1.Micro (AMD) 实例创建: 容量不足（将在下次调度时重试）"
+    elif [[ $STATUS_E2 -eq $OCI_EXIT_USER_LIMIT_ERROR ]]; then
+        log_info "E2.1.Micro (AMD) 实例创建: 已达用户限额"
     elif [[ $STATUS_E2 -eq 124 ]]; then
         log_warning "E2.1.Micro (AMD) 实例创建: 超时"
     else
