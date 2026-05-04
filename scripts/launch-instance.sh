@@ -130,9 +130,9 @@ lookup_image_id() {
                 --raw-output)
                 
             if [[ -z "$image_id" || "$image_id" == "null" ]]; then
-                local error_msg="No image found for $operating_system $os_version"
+                local error_msg="未找到操作系统 $operating_system $os_version 的镜像"
                 log_error "$error_msg"
-                send_telegram_notification "error" "OCI poller error: $error_msg"
+                send_telegram_notification "error" "OCI 镜像查找失败: $error_msg"
                 die "$error_msg"
             fi
             
@@ -694,7 +694,7 @@ handle_launch_error_with_ad() {
             ;;
         "AUTH")
             log_error "AD $current_ad 中认证/授权错误"
-            send_telegram_notification "critical" "OCI authentication error: Check credentials and permissions"
+            send_telegram_notification "critical" "OCI 认证错误: 请检查凭据和权限"
             echo "AUTH"
             return 0
             ;;
@@ -702,7 +702,7 @@ handle_launch_error_with_ad() {
             log_error "AD $current_ad 中检测到配置错误"
             local error_line
             error_line=$(echo "$error_output" | head -1)
-            send_telegram_notification "critical" "OCI configuration error: ${error_line}"
+            send_telegram_notification "critical" "OCI 配置错误: ${error_line}"
             echo "CONFIG"
             return 0
             ;;
@@ -720,7 +720,7 @@ handle_launch_error_with_ad() {
             log_error "AD $current_ad 中实例启动时发生意外错误"
             local error_line
             error_line=$(echo "$error_output" | head -1)
-            send_telegram_notification "error" "OCI instance launch failed in $current_ad: ${error_line}"
+            send_telegram_notification "error" "OCI 实例启动失败（AD $current_ad）: ${error_line}"
             echo "UNKNOWN"
             return 0
             ;;
@@ -788,7 +788,7 @@ verify_instance_creation() {
             # Record success pattern for adaptive scheduling
             record_success_pattern "VERIFIED" "1" "1"
             
-            send_telegram_notification "success" "OCI instance verified: ${INSTANCE_DISPLAY_NAME} (OCID: ${instance_id}, State: ${state})"
+            send_telegram_notification "success" "OCI 实例验证成功: ${INSTANCE_DISPLAY_NAME} (OCID: ${instance_id}, 状态: ${state})"
             return 0
         fi
         

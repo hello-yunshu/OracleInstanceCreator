@@ -209,7 +209,7 @@ require_env_var() {
     local var_value="${!var_name:-}"
     
     if [[ -z "$var_value" ]]; then
-        die "Required environment variable $var_name is not set"
+        die "必需的环境变量 $var_name 未设置"
     fi
 }
 
@@ -390,7 +390,7 @@ oci_cmd() {
 # Check if OCI CLI is available
 check_oci_cli() {
     if ! command -v oci >/dev/null 2>&1; then
-        die "OCI CLI is not installed or not in PATH"
+        die "OCI CLI 未安装或不在 PATH 中"
     fi
     
     log_debug "OCI CLI 已找到: $(which oci)"
@@ -785,7 +785,7 @@ parse_and_configure_proxy() {
         if [[ -z "$proxy_user" || -z "$proxy_pass" || -z "$proxy_host" || ! "$proxy_port" =~ ^[0-9]+$ ]]; then
             log_error "无效的 IPv6 代理格式。期望格式: USER:PASS@[HOST]:PORT"
             log_error "示例: myuser:mypass@[::1]:3128"
-            die "Invalid IPv6 proxy configuration"
+            die "IPv6 代理配置无效"
         fi
     else
         # Try IPv4 format
@@ -804,7 +804,7 @@ parse_and_configure_proxy() {
             log_error "  myuser:mypass@proxy.example.com:3128"
             log_error "  myuser:mypass@192.168.1.100:3128"
             log_error "  myuser:mypass@[::1]:3128"
-            die "Invalid proxy configuration - check OCI_PROXY_URL format"
+            die "代理配置无效 - 请检查 OCI_PROXY_URL 格式"
         fi
     fi
     
@@ -814,16 +814,16 @@ parse_and_configure_proxy() {
     
     # Validate components
     if [[ -z "$proxy_user" || -z "$proxy_pass" ]]; then
-        die "Proxy user and password cannot be empty"
+        die "代理用户名和密码不能为空"
     fi
     
     if [[ -z "$proxy_host" ]]; then
-        die "Proxy host cannot be empty"
+        die "代理主机不能为空"
     fi
     
     # Validate port range
     if [[ $proxy_port -lt 1 || $proxy_port -gt 65535 ]]; then
-        die "Proxy port must be between 1 and 65535, got: $proxy_port"
+        die "代理端口必须在 1-65535 之间，当前值: $proxy_port"
     fi
     
     # If validation only, we're done

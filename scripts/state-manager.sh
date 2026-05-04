@@ -645,11 +645,11 @@ should_create_instance() {
     
     # Method 1: Direct instance name mapping (highest priority)
     case "$instance_name" in
-        "a1-flex-sg")
+        *"a1"*|*"A1"*)
             shape="VM.Standard.A1.Flex"
             log_debug "已将实例 '$instance_name' 映射到形状 '$shape'（直接映射）"
             ;;
-        "e2-micro-sg")
+        *"e2"*|*"E2"*)
             shape="VM.Standard.E2.1.Micro"
             log_debug "已将实例 '$instance_name' 映射到形状 '$shape'（直接映射）"
             ;;

@@ -112,8 +112,8 @@ record_attempt_context() {
             fi
         done
     else
-        log_debug "GitHub CLI or token not available - pattern tracking disabled"
-        log_debug "REMEDIATION: Install 'gh' CLI and set GITHUB_TOKEN environment variable to enable adaptive scheduling"
+        log_debug "GitHub CLI 或令牌不可用 - 模式追踪已禁用"
+        log_debug "修复建议: 安装 'gh' CLI 并设置 GITHUB_TOKEN 环境变量以启用自适应调度"
     fi
 }
 

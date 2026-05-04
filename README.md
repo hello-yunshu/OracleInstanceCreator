@@ -266,9 +266,6 @@ OracleInstanceCreator/
 ├── .github/workflows/
 │   └── infrastructure-deployment.yml   # GitHub Actions 工作流
 ├── config/
-│   ├── defaults.yml                    # 默认配置
-│   ├── instance-profiles.yml           # 实例配置档案
-│   ├── regions.yml                     # 区域与可用域定义
 │   └── templates/                      # 配置模板
 ├── scripts/
 │   ├── launch-parallel.sh              # 并行启动编排器

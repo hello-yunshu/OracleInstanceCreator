@@ -12,7 +12,7 @@ VALIDATION_ERRORS=0
 
 # Display validation header
 echo "========================================"
-echo "Oracle Instance Creator - Preflight Check"
+echo "Oracle 实例创建器 - 生产环境预检"
 echo "========================================"
 echo ""
 
@@ -41,10 +41,10 @@ check_required_var() {
     local description="$2"
     
     if [[ -z "${!var_name:-}" ]]; then
-        validation_error "$description: $var_name is not set"
+        validation_error "$description: $var_name 未设置"
         return 1
     else
-        validation_success "$description: $var_name is configured"
+        validation_success "$description: $var_name 已配置"
         return 0
     fi
 }
@@ -56,15 +56,15 @@ validate_ocid_var() {
     local ocid="${!var_name:-}"
     
     if [[ -z "$ocid" ]]; then
-        validation_error "$description: $var_name is not set"
+        validation_error "$description: $var_name 未设置"
         return 1
     fi
     
     if is_valid_ocid "$ocid"; then
-        validation_success "$description: $var_name has valid OCID format"
+        validation_success "$description: $var_name OCID 格式有效"
         return 0
     else
-        validation_error "$description: $var_name has invalid OCID format: $ocid"
+        validation_error "$description: $var_name OCID 格式无效: $ocid"
         return 1
     fi
 }
@@ -103,9 +103,9 @@ validate_ocid_var "OCI_SUBNET_ID" "Subnet OCID"
 
 # Validate image OCID if provided
 if [[ -n "${OCI_IMAGE_ID:-}" ]]; then
-    validate_ocid_var "OCI_IMAGE_ID" "Image OCID"
+    validate_ocid_var "OCI_IMAGE_ID" "镜像 OCID"
 else
-    validation_warning "Image OCID: Will be auto-detected (OCI_IMAGE_ID not set)"
+    validation_warning "镜像 OCID: 将自动检测（OCI_IMAGE_ID 未设置）"
 fi
 
 echo ""
@@ -114,49 +114,47 @@ echo ""
 
 # Instance shape validation
 if [[ -n "${OCI_SHAPE:-}" ]]; then
-    validation_success "Instance shape: $OCI_SHAPE"
+    validation_success "实例形状: $OCI_SHAPE"
     
-    # Check for flexible shape configuration
     if [[ "$OCI_SHAPE" == *".Flex" ]]; then
         if [[ -n "${OCI_OCPUS:-}" && -n "${OCI_MEMORY_IN_GBS:-}" ]]; then
-            validation_success "Flexible shape config: ${OCI_OCPUS} OCPUs, ${OCI_MEMORY_IN_GBS} GB RAM"
+            validation_success "弹性形状配置: ${OCI_OCPUS} OCPU, ${OCI_MEMORY_IN_GBS} GB 内存"
         else
-            validation_error "Flexible shape requires OCI_OCPUS and OCI_MEMORY_IN_GBS"
+            validation_error "弹性形状需要 OCI_OCPUS 和 OCI_MEMORY_IN_GBS"
         fi
     fi
 else
-    validation_error "Instance shape not specified (OCI_SHAPE)"
+    validation_error "实例形状未指定 (OCI_SHAPE)"
 fi
 
 # Availability domain validation
 if [[ -n "${OCI_AD:-}" ]]; then
-    # Check if it's multi-AD format
     if [[ "$OCI_AD" == *","* ]]; then
         IFS=',' read -ra ad_list <<< "$OCI_AD"
-        validation_success "Multi-AD configuration: ${#ad_list[@]} domains"
+        validation_success "多 AD 配置: ${#ad_list[@]} 个域"
         for ad in "${ad_list[@]}"; do
             if validate_availability_domain "$ad"; then
-                log_info "  - $ad: Valid format"
+                log_info "  - $ad: 格式有效"
             else
-                validation_error "  - $ad: Invalid format"
+                validation_error "  - $ad: 格式无效"
             fi
         done
     else
         if validate_availability_domain "$OCI_AD"; then
-            validation_success "Availability domain: $OCI_AD"
+            validation_success "可用性域: $OCI_AD"
         else
-            validation_error "Invalid availability domain format: $OCI_AD"
+            validation_error "可用性域格式无效: $OCI_AD"
         fi
     fi
 else
-    validation_error "Availability domain not specified (OCI_AD)"
+    validation_error "可用性域未指定 (OCI_AD)"
 fi
 
 # Operating system validation
 if [[ -n "${OPERATING_SYSTEM:-}" ]]; then
-    validation_success "Operating system: ${OPERATING_SYSTEM} ${OS_VERSION:-}"
+    validation_success "操作系统: ${OPERATING_SYSTEM} ${OS_VERSION:-}"
 else
-    validation_error "Operating system not specified (OPERATING_SYSTEM)"
+    validation_error "操作系统未指定 (OPERATING_SYSTEM)"
 fi
 
 echo ""
@@ -165,23 +163,21 @@ echo ""
 
 # OCI CLI availability
 if command -v oci >/dev/null 2>&1; then
-    validation_success "OCI CLI is installed ($(oci --version 2>/dev/null || echo 'version unknown'))"
+    validation_success "OCI CLI 已安装 ($(oci --version 2>/dev/null || echo '版本未知'))"
 else
-    validation_error "OCI CLI is not available"
+    validation_error "OCI CLI 不可用"
 fi
 
-# jq availability (optional but recommended)
 if command -v jq >/dev/null 2>&1; then
-    validation_success "jq is available ($(jq --version 2>/dev/null || echo 'version unknown'))"
+    validation_success "jq 可用 ($(jq --version 2>/dev/null || echo '版本未知'))"
 else
-    validation_warning "jq not available - will use regex fallback for JSON parsing"
+    validation_warning "jq 不可用 - 将使用正则回退方式解析 JSON"
 fi
 
-# curl availability (for Telegram notifications)
 if command -v curl >/dev/null 2>&1; then
-    validation_success "curl is available ($(curl --version 2>/dev/null | head -1 || echo 'version unknown'))"
+    validation_success "curl 可用 ($(curl --version 2>/dev/null | head -1 || echo '版本未知'))"
 else
-    validation_error "curl is not available (required for Telegram notifications)"
+    validation_error "curl 不可用（Telegram 通知所需）"
 fi
 
 echo ""
@@ -189,36 +185,33 @@ log_info "5. 验证通知配置..."
 echo ""
 
 if [[ -n "${TELEGRAM_TOKEN:-}" && -n "${TELEGRAM_USER_ID:-}" ]]; then
-    validation_success "Telegram credentials configured"
+    validation_success "Telegram 凭据已配置"
     
-    # Test Telegram API connectivity silently (no actual notification sent)
-    # Use getMe API endpoint for silent connectivity validation
     if curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/getMe" \
         --connect-timeout 10 --max-time 15 >/dev/null 2>&1; then
-        validation_success "Telegram API connectivity verified"
+        validation_success "Telegram API 连接验证通过"
         
-        # Only send test notification if explicitly requested via environment variable
         if [[ "${PREFLIGHT_SEND_TEST_NOTIFICATION:-false}" == "true" ]]; then
-            test_message="🔧 Oracle Instance Creator preflight check completed at $(date)"
+            test_message="🔧 Oracle 实例创建器预检完成 $(date)"
             if curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
                 -d "chat_id=${TELEGRAM_USER_ID}" \
                 -d "text=${test_message}" \
                 -d "parse_mode=Markdown" >/dev/null 2>&1; then
-                validation_success "Telegram test notification sent"
+                validation_success "Telegram 测试通知已发送"
             else
-                validation_warning "Test notification failed but API is accessible"
+                validation_warning "测试通知发送失败但 API 可访问"
             fi
         fi
     else
-        validation_error "Telegram API connectivity test failed - check token and network"
+        validation_error "Telegram API 连接测试失败 - 请检查令牌和网络"
     fi
 else
-    validation_warning "Telegram credentials not configured"
+    validation_warning "Telegram 凭据未配置"
 fi
 
 echo ""
 echo "========================================"
-echo "Preflight Check Results"
+echo "预检结果"
 echo "========================================"
 
 if [[ $VALIDATION_ERRORS -eq 0 ]]; then

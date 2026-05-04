@@ -395,10 +395,10 @@ get_instance_details() {
     # Format the details
     echo "**${shape_name}** (${shape}):
 • ID: ${id}
-• Public IP: ${public_ip}
-• Private IP: ${private_ip}
-• AD: ${ad}
-• State: ${state}"
+• 公网 IP: ${public_ip}
+• 内网 IP: ${private_ip}
+• 可用性域: ${ad}
+• 状态: ${state}"
 }
 
 # Main parallel execution
@@ -759,8 +759,8 @@ main() {
     track_resource_usage "end"
 
     # Log comprehensive execution summary
-    local performance_summary="ExecutionTime=${elapsed}s,A1Duration=${a1_duration}s,E2Duration=${e2_duration}s"
-    performance_summary="${performance_summary},PeakMemory=${peak_memory}MB,SuccessRate=${success_count}/2"
+    local performance_summary="执行时间=${elapsed}s,A1耗时=${a1_duration}s,E2耗时=${e2_duration}s"
+    performance_summary="${performance_summary},峰值内存=${peak_memory}MB,成功率=${success_count}/2"
     log_performance_metric "CONCURRENT_END" "parallel_execution" "$success_count" "2" "$performance_summary"
 
     # Log structured performance data for analysis
@@ -773,7 +773,7 @@ main() {
             parallel_efficiency=$((total_shape_duration * 100 / elapsed))
         fi
         performance_context="${performance_context},\"success_count\":${success_count},\"parallel_efficiency\":${parallel_efficiency}}"
-        log_with_context "info" "Parallel execution performance summary" "$performance_context"
+        log_with_context "info" "并行执行性能摘要" "$performance_context"
     fi
 
     # Verify actual instances exist before claiming success
@@ -823,11 +823,11 @@ main() {
             
             # Send notification with details if available, fallback to basic info
             if [[ -n "$notification_details" ]]; then
-                send_telegram_notification "success" "OCI instance hunting success!
+                send_telegram_notification "success" "OCI 实例抢注成功！
 
 $notification_details"
             else
-                send_telegram_notification "success" "OCI instances created: $shapes_created"
+                send_telegram_notification "success" "OCI 实例创建成功: $shapes_created"
             fi
         fi
 
@@ -837,52 +837,45 @@ $notification_details"
         log_info "$user_limit_failures 种形状已达用户限额 - 无需继续尝试"
         log_info "请考虑管理现有实例以释放新部署的容量"
         
-        # Notification Policy: NO notifications for user limits
-        # User limits are EXPECTED free tier behavior - normal operation
-        # Per CLAUDE.md policy: "DO NOT send notifications for User limits reached (expected)"
+        # 通知策略: 用户限额不发送通知
+        # 用户限额是预期的免费层行为 - 正常运行
         
-        return 0  # User limits are not failures - they're expected behavior
+        return 0
     elif [[ $rate_limit_failures -gt 0 && $((rate_limit_failures + success_count + capacity_failures + user_limit_failures)) -eq 2 ]]; then
-        # Rate limits encountered - this is expected Oracle behavior, no notifications needed
         log_info "$rate_limit_failures 种形状遇到 Oracle API 速率限制 - 将在下次调度运行时重试"
         log_info "这是 Oracle API 在高使用期间的正常行为，会自动恢复"
         
-        # Notification Policy: NO notifications for rate limits  
-        # Rate limiting is EXPECTED Oracle API behavior during high usage periods
-        # Per CLAUDE.md policy: "DO NOT send notifications for Rate limiting (standard behavior)"
+        # 通知策略: 速率限制不发送通知
+        # 速率限制是高使用期间预期的 Oracle API 行为
         
-        return 0  # Rate limits are not failures - they're expected behavior
+        return 0
     elif [[ $capacity_failures -eq 2 ]]; then
-        # Both failed due to Oracle capacity constraints - this is expected behavior
         log_info "两种形状因 Oracle 容量限制不可用 - 将在下次调度时重试"
         log_info "这是 Oracle Cloud 容量暂时耗尽时的正常行为"
 
-        # Notification Policy: NO notifications for Oracle capacity constraints
-        # Capacity constraints are EXPECTED operational conditions that resolve through retry cycles
-        # Per CLAUDE.md policy: "DO NOT send notifications for Oracle capacity unavailable (expected)"
+        # 通知策略: 容量限制不发送通知
+        # 容量限制是预期的运行状态，通过重试周期自动解决
         
-        return 0 # Don't treat capacity exhaustion as failure
+        return 0
     elif [[ $((capacity_failures + user_limit_failures + rate_limit_failures)) -eq 2 ]]; then
-        # Mixed capacity, limit, and rate limit issues - still expected behavior
         log_info "遇到混合 Oracle 限制 - 将在下次调度时重试"
         log_info "这是 Oracle Cloud 的正常行为 - 容量、限额或速率限制"
         
-        # Notification Policy: NO notifications for mixed constraint scenarios
-        # These are EXPECTED Oracle operational conditions that resolve through retry cycles
-        # Per CLAUDE.md policy: \"DO NOT send notifications for\" expected operational conditions
+        # 通知策略: 混合限制场景不发送通知
+        # 这些是预期的 Oracle 运行状态，通过重试周期自动解决
         
-        return 0  # Mixed constraint issues are still expected behavior
+        return 0
     else
         # Analyze and report the specific failure reasons
         local failure_summary=""
         if [[ $STATUS_A1 -ne 0 && $STATUS_A1 -ne 2 && $STATUS_A1 -ne 5 && $STATUS_A1 -ne 6 ]]; then
-            failure_summary="A1.Flex failed (exit: $STATUS_A1)"
+            failure_summary="A1.Flex 失败（退出码: $STATUS_A1）"
         fi
         if [[ $STATUS_E2 -ne 0 && $STATUS_E2 -ne 2 && $STATUS_E2 -ne 5 && $STATUS_E2 -ne 6 ]]; then
             if [[ -n "$failure_summary" ]]; then
-                failure_summary="$failure_summary, E2.1.Micro failed (exit: $STATUS_E2)"
+                failure_summary="$failure_summary, E2.1.Micro 失败（退出码: $STATUS_E2）"
             else
-                failure_summary="E2.1.Micro failed (exit: $STATUS_E2)"
+                failure_summary="E2.1.Micro 失败（退出码: $STATUS_E2）"
             fi
         fi
         
@@ -907,13 +900,13 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     
     # Log final exit code for debugging (if DEBUG enabled)
     if [[ "${DEBUG:-}" == "true" ]]; then
-        echo "launch-parallel.sh final exit code: $main_exit_code"
+        echo "launch-parallel.sh 最终退出码: $main_exit_code"
         case $main_exit_code in
-            0) echo "SUCCESS: All operations completed successfully or expected Oracle constraints" ;;
-            2) echo "SUCCESS: Capacity constraints (normal Oracle behavior)" ;;
-            5) echo "SUCCESS: User limits reached (expected free tier behavior)" ;;
-            6) echo "SUCCESS: Rate limits encountered (expected Oracle API behavior)" ;;
-            *) echo "FAILURE: Genuine error requiring attention (exit $main_exit_code)" ;;
+            0) echo "成功: 所有操作完成或遇到预期的 Oracle 约束" ;;
+            2) echo "成功: 容量约束（Oracle 正常行为）" ;;
+            5) echo "成功: 用户限额已达（预期免费层行为）" ;;
+            6) echo "成功: 遇到速率限制（预期 Oracle API 行为）" ;;
+            *) echo "失败: 需要关注的真实错误（退出码 $main_exit_code）" ;;
         esac
     fi
     
