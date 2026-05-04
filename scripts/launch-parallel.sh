@@ -23,6 +23,8 @@ PID_E2=""
 temp_dir=""
 A1_VERIFIED=true
 E2_VERIFIED=true
+SHOULD_LAUNCH_A1=true
+SHOULD_LAUNCH_E2=true
 
 # Performance monitoring functions
 get_memory_usage() {
@@ -177,35 +179,29 @@ count_actual_instances() {
     
     local actual_count=0
     
-    # Check A1.Flex instance
-    local a1_instance_id
-    if a1_instance_id=$(oci_cmd compute instance list \
-        --compartment-id "$comp_id" \
-        --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-        "${ACTIVE_LIFECYCLE_STATES[@]}" \
-        --query 'data[0].id' \
-        --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
-        ((actual_count++))
-    else
-        # Log API failures for debugging while maintaining graceful degradation
-        if [[ -n "$a1_instance_id" && "$a1_instance_id" =~ (ERROR|ServiceError|Authentication) ]]; then
-            log_debug "A1.Flex 实例验证失败: ${a1_instance_id:0:100}..."
+    # Check A1.Flex instance (only if not skipped)
+    if [[ "$SHOULD_LAUNCH_A1" == "true" ]]; then
+        local a1_instance_id
+        if a1_instance_id=$(oci_cmd compute instance list \
+            --compartment-id "$comp_id" \
+            --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
+            "${ACTIVE_LIFECYCLE_STATES[@]}" \
+            --query 'data[0].id' \
+            --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
+            ((actual_count++))
         fi
     fi
     
-    # Check E2.1.Micro instance
-    local e2_instance_id
-    if e2_instance_id=$(oci_cmd compute instance list \
-        --compartment-id "$comp_id" \
-        --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-        "${ACTIVE_LIFECYCLE_STATES[@]}" \
-        --query 'data[0].id' \
-        --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
-        ((actual_count++))
-    else
-        # Log API failures for debugging while maintaining graceful degradation
-        if [[ -n "$e2_instance_id" && "$e2_instance_id" =~ (ERROR|ServiceError|Authentication) ]]; then
-            log_debug "E2.1.Micro 实例验证失败: ${e2_instance_id:0:100}..."
+    # Check E2.1.Micro instance (only if not skipped)
+    if [[ "$SHOULD_LAUNCH_E2" == "true" ]]; then
+        local e2_instance_id
+        if e2_instance_id=$(oci_cmd compute instance list \
+            --compartment-id "$comp_id" \
+            --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
+            "${ACTIVE_LIFECYCLE_STATES[@]}" \
+            --query 'data[0].id' \
+            --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
+            ((actual_count++))
         fi
     fi
     
@@ -469,8 +465,8 @@ main() {
 
     # Smart shape filtering: Check cached limit states to prevent futile API calls
     local state_file="instance-state.json"
-    local should_launch_a1=true
-    local should_launch_e2=true
+    SHOULD_LAUNCH_A1=true
+    SHOULD_LAUNCH_E2=true
     
     # Check SKIP_SHAPES environment variable (comma-separated: "E2" or "A1" or "E2,A1")
     local skip_shapes="${SKIP_SHAPES:-E2}"
@@ -480,12 +476,12 @@ main() {
             local shape_upper=$(echo "$shape" | tr '[:lower:]' '[:upper:]' | tr -d ' ')
             case "$shape_upper" in
                 E2|E2.*|MICRO|AMD)
-                    should_launch_e2=false
+                    SHOULD_LAUNCH_E2=false
                     log_info "E2.1.Micro: 已通过 SKIP_SHAPES 跳过"
                     echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$e2_result"
                     ;;
                 A1|A1.*|FLEX|ARM)
-                    should_launch_a1=false
+                    SHOULD_LAUNCH_A1=false
                     log_info "A1.Flex: 已通过 SKIP_SHAPES 跳过"
                     echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$a1_result"
                     ;;
@@ -499,7 +495,7 @@ main() {
     else
         # Check A1.Flex limit state
         if get_cached_limit_state "${A1_FLEX_CONFIG[SHAPE]}" "$state_file"; then
-            should_launch_a1=false
+            SHOULD_LAUNCH_A1=false
             log_info "A1.Flex: 缓存限额已达 - 跳过创建尝试"
             echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$a1_result"
         else
@@ -508,7 +504,7 @@ main() {
         
         # Check E2.Micro limit state  
         if get_cached_limit_state "${E2_MICRO_CONFIG[SHAPE]}" "$state_file"; then
-            should_launch_e2=false
+            SHOULD_LAUNCH_E2=false
             log_info "E2.1.Micro: 缓存限额已达 - 跳过创建尝试"
             echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$e2_result"
         else
@@ -516,7 +512,7 @@ main() {
         fi
         
         # Early exit if both shapes are at cached limits
-        if [[ "$should_launch_a1" == false && "$should_launch_e2" == false ]]; then
+        if [[ "$SHOULD_LAUNCH_A1" == false && "$SHOULD_LAUNCH_E2" == false ]]; then
             log_info "两种形状均达缓存限额 - 无需创建尝试"
             log_info "请考虑管理现有实例以释放容量，或等待限额缓存过期"
             # Clean up temporary files
@@ -526,7 +522,7 @@ main() {
     fi
 
     # Launch A1.Flex in background (if not skipped due to cached limits)
-    if [[ "$should_launch_a1" == true ]]; then
+    if [[ "$SHOULD_LAUNCH_A1" == true ]]; then
         log_info "正在后台启动 A1.Flex (ARM) 实例..."
         (
             # Capture both exit code and any error output
@@ -555,7 +551,7 @@ main() {
     fi
 
     # Launch E2.Micro in background (if not skipped due to cached limits)
-    if [[ "$should_launch_e2" == true ]]; then
+    if [[ "$SHOULD_LAUNCH_E2" == true ]]; then
         log_info "正在后台启动 E2.1.Micro (AMD) 实例..."
         (
             # Capture both exit code and any error output
@@ -676,7 +672,7 @@ main() {
         
         # Only apply timeout errors to shapes that were actually launched and have generic error codes
         # This preserves capacity/limit error codes (2, 5) which indicate expected Oracle Cloud behavior
-        if [[ "$should_launch_a1" == true ]]; then
+        if [[ "$SHOULD_LAUNCH_A1" == true ]]; then
             # Only override if no specific error code was already captured
             if [[ $STATUS_A1 -eq 1 ]]; then
                 STATUS_A1=$OCI_EXIT_TIMEOUT
@@ -688,7 +684,7 @@ main() {
             log_debug "A1 已因缓存限额跳过 - 无需超时处理"
         fi
         
-        if [[ "$should_launch_e2" == true ]]; then
+        if [[ "$SHOULD_LAUNCH_E2" == true ]]; then
             # Only override if no specific error code was already captured
             if [[ $STATUS_E2 -eq 1 ]]; then
                 STATUS_E2=$OCI_EXIT_TIMEOUT
