@@ -199,6 +199,11 @@ handle_launch_success() {
     
     mark_ad_success "$current_ad"
     
+    if [[ -n "${INSTANCE_ID_FILE:-}" && -n "$instance_id" ]]; then
+        echo "$instance_id" > "$INSTANCE_ID_FILE"
+        log_debug "已将实例 OCID 写入文件: $INSTANCE_ID_FILE"
+    fi
+    
     if [[ "${CACHE_ENABLED:-true}" == "true" ]]; then
         log_info "将实例创建记录写入状态缓存: ${INSTANCE_DISPLAY_NAME:-default}"
         record_instance_creation "${INSTANCE_DISPLAY_NAME:-default}" "$instance_id" "${state_file:-instance-state.json}"
@@ -537,7 +542,7 @@ launch_instance() {
                     else
                         # All ADs attempted with transient errors - treat as temporary capacity issue
                         log_info "所有 AD 和重试因瞬时错误穷尽 - 将在下次调度时重试"
-                        return 0
+                        return "$OCI_EXIT_CAPACITY_ERROR"
                     fi
                 else
                     # Error type changed to something else during retries - handle it
@@ -598,7 +603,7 @@ launch_instance() {
     
     # Should not reach here, but handle gracefully
     log_info "所有可用性域已尝试 - 将在下次调度时重试"
-    return 0
+    return "$OCI_EXIT_CAPACITY_ERROR"
 }
 
 # Handle and classify errors from instance launch attempts in multi-AD scenario

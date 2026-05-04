@@ -233,6 +233,11 @@ launch_shape() {
     else
         unset BOOT_VOLUME_ID
     fi
+    
+    # Set instance ID file path for OCID communication
+    local shape_key=$(echo "$shape_name" | tr '[:upper:]' '[:lower:]' | tr -d '.')
+    export INSTANCE_ID_FILE="${temp_dir}/${shape_key}_instance_id"
+    rm -f "$INSTANCE_ID_FILE" 2>/dev/null || true
 
     # Launch the instance using existing script
     local script_dir
@@ -280,9 +285,39 @@ verify_and_update_state() {
     verify_instance_exists() {
         local display_name="$1"
         local comp_id="$2"
-        local max_retries=3
-        local retry_delay=3
+        local instance_id_file="${3:-}"
+        local max_retries=5
+        local retry_delay=5
         
+        # 优先使用 OCID 直接查询（比 display-name 搜索更可靠）
+        if [[ -n "$instance_id_file" && -f "$instance_id_file" ]]; then
+            local ocid
+            ocid=$(cat "$instance_id_file" 2>/dev/null || echo "")
+            if [[ -n "$ocid" && "$ocid" != "null" ]]; then
+                log_debug "使用 OCID 直接查询实例: ${ocid:0:30}..."
+                for i in $(seq 1 $max_retries); do
+                    local state
+                    state=$(oci_cmd compute instance get \
+                        --instance-id "$ocid" \
+                        --query 'data."lifecycle-state"' \
+                        --raw-output 2>/dev/null || echo "")
+                    
+                    if [[ -n "$state" && "$state" != "null" ]]; then
+                        log_debug "通过 OCID 找到实例（状态: $state）"
+                        echo "$ocid"
+                        return 0
+                    fi
+                    
+                    if [[ $i -lt $max_retries ]]; then
+                        log_debug "OCID 查询未返回状态，${retry_delay}s 后重试 ($i/$max_retries)..."
+                        sleep $retry_delay
+                    fi
+                done
+                log_debug "OCID 直接查询失败，回退到 display-name 搜索"
+            fi
+        fi
+        
+        # 回退：使用 display-name 搜索
         local instance_id=""
         for i in $(seq 1 $max_retries); do
             instance_id=$(oci_cmd compute instance list \
@@ -310,7 +345,7 @@ verify_and_update_state() {
     # Verify A1.Flex instance state if creation was attempted
     if [[ "$status_a1" -eq 0 ]]; then
         local a1_instance_id
-        a1_instance_id=$(verify_instance_exists "${A1_FLEX_CONFIG[DISPLAY_NAME]}" "$comp_id")
+        a1_instance_id=$(verify_instance_exists "${A1_FLEX_CONFIG[DISPLAY_NAME]}" "$comp_id" "${temp_dir}/a1flex_instance_id")
         
         if [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
             log_info "已验证 A1.Flex 实例存在: $a1_instance_id"
@@ -329,7 +364,7 @@ verify_and_update_state() {
     # Verify E2.Micro instance state if creation was attempted
     if [[ "$status_e2" -eq 0 ]]; then
         local e2_instance_id
-        e2_instance_id=$(verify_instance_exists "${E2_MICRO_CONFIG[DISPLAY_NAME]}" "$comp_id")
+        e2_instance_id=$(verify_instance_exists "${E2_MICRO_CONFIG[DISPLAY_NAME]}" "$comp_id" "${temp_dir}/e21micro_instance_id")
         
         if [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
             log_info "已验证 E2.Micro 实例存在: $e2_instance_id"
