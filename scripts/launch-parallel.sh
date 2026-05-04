@@ -97,13 +97,45 @@ trap cleanup_handler SIGTERM SIGINT
 
 ACTIVE_LIFECYCLE_STATES=(--lifecycle-state MOVING --lifecycle-state PROVISIONING --lifecycle-state RUNNING --lifecycle-state STARTING --lifecycle-state STOPPING --lifecycle-state STOPPED --lifecycle-state CREATING_IMAGE)
 
+get_region_suffix() {
+    local region="${OCI_REGION:-}"
+    case "$region" in
+        ap-singapore-1)  echo "sg" ;;
+        ap-tokyo-1)      echo "tk" ;;
+        ap-seoul-1)      echo "se" ;;
+        ap-osaka-1)      echo "os" ;;
+        ap-mumbai-1)     echo "mb" ;;
+        ap-hyderabad-1)  echo "hy" ;;
+        ap-melbourne-1)  echo "ml" ;;
+        ap-sydney-1)     echo "sy" ;;
+        us-sanjose-1)    echo "sj" ;;
+        us-phoenix-1)    echo "ph" ;;
+        us-ashburn-1)    echo "ab" ;;
+        us-chicago-1)    echo "ch" ;;
+        eu-frankfurt-1)  echo "fr" ;;
+        eu-amsterdam-1)  echo "am" ;;
+        eu-london-1)     echo "ln" ;;
+        eu-zurich-1)     echo "zh" ;;
+        sa-saopaulo-1)   echo "sp" ;;
+        me-dubai-1)      echo "db" ;;
+        me-jeddah-1)     echo "jd" ;;
+        ca-montreal-1)   echo "mt" ;;
+        ca-toronto-1)    echo "to" ;;
+        ap-chuncheon-1)  echo "cc" ;;
+        ap-ibaraki-1)    echo "ik" ;;
+        *)               echo "${region%%-[0-9]*}" ;;
+    esac
+}
+
+REGION_SUFFIX=$(get_region_suffix)
+
 # Shape configurations for Oracle Cloud free tier
 # shellcheck disable=SC2034  # Used via nameref in launch_shape()
 declare -A A1_FLEX_CONFIG=(
     ["SHAPE"]="VM.Standard.A1.Flex"
     ["OCPUS"]="4"
     ["MEMORY_IN_GBS"]="24"
-    ["DISPLAY_NAME"]="a1-flex-sg"
+    ["DISPLAY_NAME"]="a1-flex-${REGION_SUFFIX}"
     ["BOOT_VOLUME_ID"]="${A1_BOOT_VOLUME_ID:-${BOOT_VOLUME_ID:-}}"
 )
 
@@ -112,7 +144,7 @@ declare -A E2_MICRO_CONFIG=(
     ["SHAPE"]="VM.Standard.E2.1.Micro"
     ["OCPUS"]=""
     ["MEMORY_IN_GBS"]=""
-    ["DISPLAY_NAME"]="e2-micro-sg"
+    ["DISPLAY_NAME"]="e2-micro-${REGION_SUFFIX}"
     ["BOOT_VOLUME_ID"]="${E2_BOOT_VOLUME_ID:-${BOOT_VOLUME_ID:-}}"
 )
 
