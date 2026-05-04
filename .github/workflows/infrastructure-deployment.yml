@@ -154,7 +154,7 @@ jobs:
 
       - name: 恢复实例状态缓存
         id: cache-instance-state
-        uses: actions/cache/restore@v4.2.4
+        uses: actions/cache/restore@v5
         with:
           path: .cache/oci-state
           key: ${{ steps.cache-key.outputs.key }}
@@ -195,7 +195,7 @@ jobs:
         run: echo "oci-cli" > requirements.txt
 
       - name: 配置 Python 环境
-        uses: actions/setup-python@v5.6.0
+        uses: actions/setup-python@v6
         id: setup-python
         with:
           python-version: '3.x'
@@ -203,7 +203,7 @@ jobs:
           update-environment: true
 
       - name: 缓存 pip 依赖
-        uses: actions/cache@v4.2.4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
@@ -347,7 +347,7 @@ jobs:
 
       - name: 保存实例状态缓存
         if: always()
-        uses: actions/cache/save@v4.2.4
+        uses: actions/cache/save@v5
         with:
           path: .cache/oci-state
           key: ${{ steps.cache-key.outputs.key }}
