@@ -95,6 +95,8 @@ cleanup_handler() {
 # Set up signal handlers
 trap cleanup_handler SIGTERM SIGINT
 
+ACTIVE_LIFECYCLE_STATES=(--lifecycle-state MOVING --lifecycle-state PROVISIONING --lifecycle-state RUNNING --lifecycle-state STARTING --lifecycle-state STOPPING --lifecycle-state STOPPED --lifecycle-state CREATING_IMAGE)
+
 # Shape configurations for Oracle Cloud free tier
 # shellcheck disable=SC2034  # Used via nameref in launch_shape()
 declare -A A1_FLEX_CONFIG=(
@@ -146,7 +148,7 @@ count_actual_instances() {
     if a1_instance_id=$(oci_cmd compute instance list \
         --compartment-id "$comp_id" \
         --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-        --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
+        "${ACTIVE_LIFECYCLE_STATES[@]}" \
         --query 'data[0].id' \
         --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
         ((actual_count++))
@@ -162,7 +164,7 @@ count_actual_instances() {
     if e2_instance_id=$(oci_cmd compute instance list \
         --compartment-id "$comp_id" \
         --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-        --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
+        "${ACTIVE_LIFECYCLE_STATES[@]}" \
         --query 'data[0].id' \
         --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
         ((actual_count++))
@@ -248,7 +250,7 @@ verify_and_update_state() {
         if a1_instance_id=$(oci_cmd compute instance list \
             --compartment-id "$comp_id" \
             --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-            --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
+            "${ACTIVE_LIFECYCLE_STATES[@]}" \
             --query 'data[0].id' \
             --raw-output); then
             
@@ -275,7 +277,7 @@ verify_and_update_state() {
         if e2_instance_id=$(oci_cmd compute instance list \
             --compartment-id "$comp_id" \
             --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-            --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
+            "${ACTIVE_LIFECYCLE_STATES[@]}" \
             --query 'data[0].id' \
             --raw-output); then
             
@@ -744,7 +746,7 @@ main() {
             if [[ -n "$comp_id" ]] && a1_instance_id=$(oci_cmd compute instance list \
                 --compartment-id "$comp_id" \
                 --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-                --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
+                "${ACTIVE_LIFECYCLE_STATES[@]}" \
                 --query 'data[0].id' \
                 --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
                 shapes_created="A1.Flex (ARM)"
@@ -758,7 +760,7 @@ main() {
             if [[ -n "$comp_id" ]] && e2_instance_id=$(oci_cmd compute instance list \
                 --compartment-id "$comp_id" \
                 --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-                --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
+                "${ACTIVE_LIFECYCLE_STATES[@]}" \
                 --query 'data[0].id' \
                 --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
                 shapes_created="${shapes_created:+$shapes_created, }E2.1.Micro (AMD)"

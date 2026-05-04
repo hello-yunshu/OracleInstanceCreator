@@ -763,7 +763,7 @@ verify_instance_creation() {
         instance_id=$(oci_cmd compute instance list \
             --compartment-id "$comp_id" \
             --display-name "$INSTANCE_DISPLAY_NAME" \
-            --lifecycle-state RUNNING --lifecycle-state PROVISIONING \
+            --lifecycle-state MOVING --lifecycle-state PROVISIONING --lifecycle-state RUNNING --lifecycle-state STARTING --lifecycle-state STOPPING --lifecycle-state STOPPED --lifecycle-state CREATING_IMAGE \
             --limit 1 \
             --query 'data[0].id' \
             --raw-output || echo "")
