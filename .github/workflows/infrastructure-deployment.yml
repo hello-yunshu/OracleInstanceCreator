@@ -133,7 +133,7 @@ jobs:
       ENABLE_REGION_OPTIMIZATION: ${{ inputs.region_optimization && 'true' || 'false' }}
       # 区域时区（新加坡: Asia/Singapore, 圣何塞: America/Los_Angeles, 阿什本: America/New_York）
       # 也可通过 Secret OCI_REGION_TIMEZONE 覆盖
-      ORACLE_REGION_TIMEZONE: ${{ secrets.OCI_REGION_TIMEZONE || 'Asia/Singapore' }}
+      OCI_REGION_TIMEZONE: ${{ secrets.OCI_REGION_TIMEZONE || 'Asia/Singapore' }}
       SUCCESS_TRACKING_ENABLED: "true"
     steps:
       - name: 检出仓库

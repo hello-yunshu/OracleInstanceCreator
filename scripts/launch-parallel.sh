@@ -114,13 +114,30 @@ declare -A E2_MICRO_CONFIG=(
     ["BOOT_VOLUME_ID"]="${E2_BOOT_VOLUME_ID:-${BOOT_VOLUME_ID:-}}"
 )
 
+determine_compartment() {
+    local comp_id
+
+    if [[ -z "${OCI_COMPARTMENT_ID:-}" ]]; then
+        comp_id="${OCI_TENANCY_OCID:-}"
+        if [[ -n "$comp_id" ]]; then
+            log_info "使用租户 OCID 作为区间"
+        fi
+    else
+        comp_id="$OCI_COMPARTMENT_ID"
+        log_info "使用指定区间"
+    fi
+
+    echo "$comp_id"
+}
+
 # Verify actual instance existence by querying OCI API
 count_actual_instances() {
     local comp_id
-    comp_id=$(require_env_var "OCI_COMPARTMENT_ID" 2>/dev/null) || {
-        log_debug "OCI_COMPARTMENT_ID 不可用 - 无法验证实例数量"
+    comp_id=$(determine_compartment)
+    if [[ -z "$comp_id" ]]; then
+        log_debug "OCI_COMPARTMENT_ID 和 OCI_TENANCY_OCID 均不可用 - 无法验证实例数量"
         return 0
-    }
+    fi
     
     local actual_count=0
     
@@ -136,7 +153,7 @@ count_actual_instances() {
     else
         # Log API failures for debugging while maintaining graceful degradation
         if [[ -n "$a1_instance_id" && "$a1_instance_id" =~ (ERROR|ServiceError|Authentication) ]]; then
-            log_debug "A1.Flex instance verification failed: ${a1_instance_id:0:100}..."
+            log_debug "A1.Flex 实例验证失败: ${a1_instance_id:0:100}..."
         fi
     fi
     
@@ -152,7 +169,7 @@ count_actual_instances() {
     else
         # Log API failures for debugging while maintaining graceful degradation
         if [[ -n "$e2_instance_id" && "$e2_instance_id" =~ (ERROR|ServiceError|Authentication) ]]; then
-            log_debug "E2.1.Micro instance verification failed: ${e2_instance_id:0:100}..."
+            log_debug "E2.1.Micro 实例验证失败: ${e2_instance_id:0:100}..."
         fi
     fi
     
@@ -218,9 +235,10 @@ verify_and_update_state() {
     
     # Get the compartment ID for OCI API calls
     local comp_id
-    if ! comp_id=$(require_env_var "OCI_COMPARTMENT_ID" 2>/dev/null); then
-        log_error "OCI_COMPARTMENT_ID 不可用 - 无法验证实例状态"
-        return 2  # Return specific error code for missing config
+    comp_id=$(determine_compartment)
+    if [[ -z "$comp_id" ]]; then
+        log_error "OCI_COMPARTMENT_ID 和 OCI_TENANCY_OCID 均不可用 - 无法验证实例状态"
+        return 2
     fi
     
     # Verify A1.Flex instance state if creation was attempted
@@ -279,7 +297,7 @@ verify_and_update_state() {
     
     # Log current state for debugging
     if [[ "${DEBUG:-}" == "true" ]]; then
-        log_debug "Current instance state after verification:"
+        log_debug "验证后当前实例状态:"
         print_state "$state_file"
     fi
     
@@ -288,7 +306,7 @@ verify_and_update_state() {
         log_warning "实例状态验证完成，有 $verification_errors 个错误"
         return 3  # Return specific code for verification errors (non-critical)
     else
-        log_debug "Instance state verification completed successfully"
+        log_debug "实例状态验证完成"
         return 0
     fi
 }
@@ -307,7 +325,7 @@ get_instance_details() {
     if ! instance_data=$(oci_cmd compute instance get --instance-id "$instance_id" \
         --query 'data.{id:id,shape:shape,ad:availabilityDomain,state:lifecycleState}' \
         --output json 2>/dev/null); then
-        log_debug "Failed to get details for instance $instance_id"
+        log_debug "获取实例 $instance_id 详情失败"
         return 1
     fi
     
@@ -316,7 +334,7 @@ get_instance_details() {
     if ! vnic_data=$(oci_cmd compute instance list-vnics --instance-id "$instance_id" \
         --query 'data[0].{publicIp:publicIp,privateIp:privateIp}' \
         --output json 2>/dev/null); then
-        log_debug "Failed to get VNIC details for instance $instance_id"
+        log_debug "获取实例 $instance_id VNIC 详情失败"
         # Continue without IP info
         vnic_data='{"publicIp":null,"privateIp":null}'
     fi
@@ -347,13 +365,13 @@ main() {
     # Set timeout to prevent exceeding 60 seconds (GitHub Actions billing boundary)
     # Using constant defined in constants.sh for consistency and maintainability
     local timeout_seconds=$GITHUB_ACTIONS_BILLING_TIMEOUT
-    log_debug "Setting execution timeout to ${timeout_seconds}s to avoid 2-minute billing"
+    log_debug "设置执行超时为 ${timeout_seconds}s 以避免 2 分钟计费"
 
     # Create temporary files for process communication with secure permissions
     umask 077             # Ensure secure permissions (owner only)
     temp_dir=$(mktemp -d) # Using global variable for cleanup handler
     chmod 700 "$temp_dir" # Explicit directory permissions
-    log_debug "Created secure temporary directory: $temp_dir"
+    log_debug "已创建安全临时目录: $temp_dir"
     local a1_result="${temp_dir}/a1_result"
     local e2_result="${temp_dir}/e2_result"
 
@@ -370,7 +388,7 @@ main() {
     local should_launch_e2=true
     
     # Check SKIP_SHAPES environment variable (comma-separated: "E2" or "A1" or "E2,A1")
-    local skip_shapes="${SKIP_SHAPES:-}"
+    local skip_shapes="${SKIP_SHAPES:-E2}"
     if [[ -n "$skip_shapes" ]]; then
         IFS=',' read -ra skip_list <<< "$skip_shapes"
         for shape in "${skip_list[@]}"; do
@@ -431,7 +449,7 @@ main() {
             local exit_code=0
             if ! launch_shape "A1.Flex" A1_FLEX_CONFIG; then
                 exit_code=$?
-                log_debug "A1.Flex launch_shape returned exit code: $exit_code"
+                log_debug "A1.Flex launch_shape 返回退出码: $exit_code"
             fi
             
             # Ensure result file is written atomically
@@ -439,15 +457,15 @@ main() {
             echo "$exit_code" > "$temp_result"
             mv "$temp_result" "$a1_result"
             
-            log_debug "A1.Flex background process writing exit code $exit_code to result file"
+            log_debug "A1.Flex 后台进程写入退出码 $exit_code 到结果文件"
             # Small delay to ensure file system flush
             sleep 0.1
             exit $exit_code
         ) &
         PID_A1=$!
-        log_debug "A1.Flex background process started with PID: $PID_A1"
+        log_debug "A1.Flex 后台进程已启动，PID: $PID_A1"
     else
-        log_debug "Skipping A1.Flex launch due to cached limit state"
+        log_debug "跳过 A1.Flex 启动 - 缓存限额状态"
         PID_A1=""
     fi
 
@@ -460,7 +478,7 @@ main() {
             local exit_code=0
             if ! launch_shape "E2.1.Micro" E2_MICRO_CONFIG; then
                 exit_code=$?
-                log_debug "E2.1.Micro launch_shape returned exit code: $exit_code"
+                log_debug "E2.1.Micro launch_shape 返回退出码: $exit_code"
             fi
             
             # Ensure result file is written atomically
@@ -468,15 +486,15 @@ main() {
             echo "$exit_code" > "$temp_result"
             mv "$temp_result" "$e2_result"
             
-            log_debug "E2.1.Micro background process writing exit code $exit_code to result file"
+            log_debug "E2.1.Micro 后台进程写入退出码 $exit_code 到结果文件"
             # Small delay to ensure file system flush
             sleep 0.1
             exit $exit_code
         ) &
         PID_E2=$!
-        log_debug "E2.1.Micro background process started with PID: $PID_E2"
+        log_debug "E2.1.Micro 后台进程已启动，PID: $PID_E2"
     else
-        log_debug "Skipping E2.1.Micro launch due to cached limit state"
+        log_debug "跳过 E2.1.Micro 启动 - 缓存限额状态"
         PID_E2=""
     fi
 
@@ -509,7 +527,7 @@ main() {
         fi
         
         if [[ "$a1_running" == false && "$e2_running" == false ]]; then
-            log_debug "Both processes completed (or were skipped) after ${elapsed}s"
+            log_debug "两个进程均已完成（或已跳过），耗时 ${elapsed}s"
             break
         fi
 
@@ -527,14 +545,14 @@ main() {
     local e2_wait_result=0
     
     if [[ -n "$PID_A1" ]]; then
-        log_debug "Waiting for A1.Flex process (PID: $PID_A1) to complete"
+        log_debug "等待 A1.Flex 进程 (PID: $PID_A1) 完成"
         wait $PID_A1 2>/dev/null || a1_wait_result=$?
-        log_debug "A1.Flex process wait completed with result: $a1_wait_result"
+        log_debug "A1.Flex 进程等待完成，结果: $a1_wait_result"
     fi
     if [[ -n "$PID_E2" ]]; then
-        log_debug "Waiting for E2.1.Micro process (PID: $PID_E2) to complete"
+        log_debug "等待 E2.1.Micro 进程 (PID: $PID_E2) 完成"
         wait $PID_E2 2>/dev/null || e2_wait_result=$?
-        log_debug "E2.1.Micro process wait completed with result: $e2_wait_result"
+        log_debug "E2.1.Micro 进程等待完成，结果: $e2_wait_result"
     fi
 
     # Additional wait to ensure file system consistency after process completion
@@ -543,7 +561,7 @@ main() {
     # Wait for result files with proper timeout (fixes race condition)
     if wait_for_result_file "$a1_result"; then
         STATUS_A1=$(cat "$a1_result" 2>/dev/null || echo "1")
-        log_debug "A1 result file found with status: $STATUS_A1"
+        log_debug "A1 结果文件已找到，状态: $STATUS_A1"
         # Validate the status is numeric
         if [[ ! "$STATUS_A1" =~ ^[0-9]+$ ]]; then
             log_warning "A1 结果文件包含无效状态 '$STATUS_A1'，使用失败状态"
@@ -556,7 +574,7 @@ main() {
 
     if wait_for_result_file "$e2_result"; then
         STATUS_E2=$(cat "$e2_result" 2>/dev/null || echo "1")
-        log_debug "E2 result file found with status: $STATUS_E2"
+        log_debug "E2 结果文件已找到，状态: $STATUS_E2"
         # Validate the status is numeric
         if [[ ! "$STATUS_E2" =~ ^[0-9]+$ ]]; then
             log_warning "E2 结果文件包含无效状态 '$STATUS_E2'，使用失败状态"
@@ -577,24 +595,24 @@ main() {
             # Only override if no specific error code was already captured
             if [[ $STATUS_A1 -eq 1 ]]; then
                 STATUS_A1=$OCI_EXIT_TIMEOUT
-                log_debug "A1 timeout applied (was launched, no specific error code)"
+                log_debug "A1 超时已应用（已启动，无特定错误码）"
             else
-                log_debug "A1 timeout occurred but preserving error code $STATUS_A1 (capacity/limit detection)"
+                log_debug "A1 超时但保留错误码 $STATUS_A1（容量/限额检测）"
             fi
         else
-            log_debug "A1 was skipped due to cached limits - no timeout handling needed"
+            log_debug "A1 已因缓存限额跳过 - 无需超时处理"
         fi
         
         if [[ "$should_launch_e2" == true ]]; then
             # Only override if no specific error code was already captured
             if [[ $STATUS_E2 -eq 1 ]]; then
                 STATUS_E2=$OCI_EXIT_TIMEOUT
-                log_debug "E2 timeout applied (was launched, no specific error code)"
+                log_debug "E2 超时已应用（已启动，无特定错误码）"
             else
-                log_debug "E2 timeout occurred but preserving error code $STATUS_E2 (capacity/limit detection)"
+                log_debug "E2 超时但保留错误码 $STATUS_E2（容量/限额检测）"
             fi
         else
-            log_debug "E2 was skipped due to cached limits - no timeout handling needed"
+            log_debug "E2 已因缓存限额跳过 - 无需超时处理"
         fi
     fi
     
@@ -716,7 +734,7 @@ main() {
         # Instance hunting success: notify for ANY created instances with details
         if [[ "${ENABLE_NOTIFICATIONS:-}" == "true" ]]; then
             local comp_id
-            comp_id=$(require_env_var "OCI_COMPARTMENT_ID" 2>/dev/null) || comp_id=""
+            comp_id=$(determine_compartment)
             
             local notification_details=""
             local shapes_created=""

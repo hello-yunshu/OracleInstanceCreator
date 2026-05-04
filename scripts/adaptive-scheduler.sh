@@ -82,7 +82,7 @@ record_attempt_context() {
             data_size=${#updated_data}
         fi
         
-        log_debug "Pattern data size: ${data_size} bytes ($(echo "$updated_data" | jq 'length' 2>/dev/null || echo "0") entries)"
+        log_debug "模式数据大小: ${data_size} 字节 ($(echo "$updated_data" | jq 'length' 2>/dev/null || echo "0") 条记录)"
     fi
     
     # Store updated pattern data with robust error handling
@@ -96,7 +96,7 @@ record_attempt_context() {
         # This handles transient network issues and API rate limiting
         while [[ $retry_count -lt $max_retries && "$success" != "true" ]]; do
             if echo "$updated_data" | gh variable set SUCCESS_PATTERN_DATA --body-file - 2>/dev/null; then
-                log_debug "Successfully updated pattern tracking data (${#updated_data} bytes)"
+                log_debug "成功更新模式跟踪数据 (${#updated_data} 字节)"
                 success=true
             else
                 retry_count=$((retry_count + 1))
@@ -152,7 +152,7 @@ analyze_success_patterns() {
             log_info "尚无模式数据可供分析"
         fi
     else
-        log_warning "jq not available - skipping detailed pattern analysis"
+        log_warning "jq 不可用 - 跳过详细模式分析"
         log_warning "修复建议: 安装 'jq' 包以启用详细的调度模式分析和建议"
         log_info "基本模式追踪将继续，但不包含详细分析"
     fi
