@@ -99,7 +99,7 @@ jobs:
       OCI_OCPUS: "4"
       OCI_MEMORY_IN_GBS: "24"
       INSTANCE_DISPLAY_NAME: "default-instance"
-      ASSIGN_PUBLIC_IP: "false"
+      ASSIGN_PUBLIC_IP: "true"
       OPERATING_SYSTEM: "Oracle Linux"
       OS_VERSION: "10"
       # 引导卷配置

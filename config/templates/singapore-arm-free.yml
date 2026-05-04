@@ -10,7 +10,7 @@ OCI_SHAPE: "VM.Standard.A1.Flex"
 OCI_OCPUS: "4"                    # Max 4 OCPUs for free tier
 OCI_MEMORY_IN_GBS: "24"          # Max 24 GB RAM for free tier
 INSTANCE_DISPLAY_NAME: "free-tier-arm-sg"
-ASSIGN_PUBLIC_IP: "false"        # Set to "true" if you need public access
+ASSIGN_PUBLIC_IP: "true"         # 分配公网 IP 以便远程访问
 
 # Operating System
 OPERATING_SYSTEM: "Oracle Linux"
