@@ -85,6 +85,7 @@ jobs:
     name: 部署 OCI 基础设施（并行编排）
     permissions:
       contents: read
+      variables: write
     outputs:
       script_exit_code: ${{ steps.launch-instances.outputs.script_exit_code }}
     env:
@@ -267,6 +268,7 @@ jobs:
       - name: 启动 OCI 实例（并行）
         id: launch-instances
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
