@@ -54,7 +54,7 @@ send_telegram_notification() {
     
     # Validate required environment variables
     if [[ -z "${TELEGRAM_TOKEN:-}" ]] || [[ -z "${TELEGRAM_USER_ID:-}" ]]; then
-        log_warning "Telegram credentials not configured, skipping notification"
+        log_warning "Telegram 凭据未配置，跳过通知"
         return 0
     fi
     
@@ -89,7 +89,7 @@ send_telegram_notification() {
 *Time*: $timestamp
 *Workflow*: Oracle Instance Creator (Parallel)"
     
-    log_debug "Sending Telegram notification: $notification_type"
+    log_debug "正在发送 Telegram 通知: $notification_type"
     
     # Send notification using curl
     local response
@@ -108,13 +108,13 @@ send_telegram_notification() {
     if [[ $status -eq 0 ]]; then
         # Check if Telegram API returned success
         if echo "$response" | grep -q '"ok":true'; then
-            log_debug "Telegram notification sent successfully"
+            log_debug "Telegram 通知发送成功"
         else
-            log_warning "Telegram API returned error: $response"
+            log_warning "Telegram API 返回错误: $response"
         fi
     else
-        log_warning "Failed to send Telegram notification (curl exit code: $status)"
-        log_debug "Curl error: $response"
+        log_warning "Telegram 通知发送失败 (curl 退出码: $status)"
+        log_debug "Curl 错误: $response"
     fi
 }
 
@@ -124,12 +124,12 @@ send_telegram_notification_with_retry() {
     local message="$2"
     local max_attempts="${3:-3}"
     
-    log_debug "Attempting to send Telegram notification with retry"
+    log_debug "尝试发送 Telegram 通知（含重试）"
     
     if retry_with_backoff "$max_attempts" 5 send_telegram_notification "$notification_type" "$message"; then
-        log_debug "Telegram notification sent successfully (with retry)"
+        log_debug "Telegram 通知发送成功（含重试）"
     else
-        log_error "Failed to send Telegram notification after $max_attempts attempts"
+        log_error "Telegram 通知在 $max_attempts 次尝试后仍发送失败"
     fi
 }
 
@@ -239,7 +239,7 @@ notify_workflow_completed() {
 
 # Test Telegram configuration
 test_telegram_config() {
-    log_info "Testing Telegram configuration..."
+    log_info "正在测试 Telegram 配置..."
     
     local test_message="Oracle Instance Creator - Configuration Test
 

@@ -69,7 +69,7 @@ validate_ocid_var() {
     fi
 }
 
-log_info "1. Checking required GitHub secrets..."
+log_info "1. 检查必需的 GitHub Secrets..."
 echo ""
 
 # OCI Configuration
@@ -89,7 +89,7 @@ check_required_var "TELEGRAM_TOKEN" "Telegram Bot Token"
 check_required_var "TELEGRAM_USER_ID" "Telegram User ID"
 
 echo ""
-log_info "2. Validating OCID formats..."
+log_info "2. 验证 OCID 格式..."
 echo ""
 
 # Validate OCID formats
@@ -109,7 +109,7 @@ else
 fi
 
 echo ""
-log_info "3. Checking instance configuration..."
+log_info "3. 检查实例配置..."
 echo ""
 
 # Instance shape validation
@@ -160,7 +160,7 @@ else
 fi
 
 echo ""
-log_info "4. Checking system dependencies..."
+log_info "4. 检查系统依赖..."
 echo ""
 
 # OCI CLI availability
@@ -185,7 +185,7 @@ else
 fi
 
 echo ""
-log_info "5. Validating notification configuration..."
+log_info "5. 验证通知配置..."
 echo ""
 
 if [[ -n "${TELEGRAM_TOKEN:-}" && -n "${TELEGRAM_USER_ID:-}" ]]; then
@@ -222,10 +222,10 @@ echo "Preflight Check Results"
 echo "========================================"
 
 if [[ $VALIDATION_ERRORS -eq 0 ]]; then
-    log_success "✓ All validations passed! Ready for production deployment"
+    log_success "✓ 所有验证通过！已准备好部署"
     exit 0
 else
-    log_error "✗ Found $VALIDATION_ERRORS validation errors"
-    log_error "Please fix the above issues before deploying"
+    log_error "✗ 发现 $VALIDATION_ERRORS 个验证错误"
+    log_error "请修复上述问题后再部署"
     exit 1
 fi

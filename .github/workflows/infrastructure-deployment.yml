@@ -105,8 +105,10 @@ jobs:
       # 引导卷配置
       BOOT_VOLUME_SIZE: "50"
       # 引导卷 ID 从 Secrets 读取，留空则创建新引导卷
+      # 优先使用形状专用 ID，未设置则回退到通用 ID
       BOOT_VOLUME_ID: ${{ secrets.OCI_BOOT_VOLUME_ID || '' }}
       A1_BOOT_VOLUME_ID: ${{ secrets.OCI_A1_BOOT_VOLUME_ID || '' }}
+      E2_BOOT_VOLUME_ID: ${{ secrets.OCI_E2_BOOT_VOLUME_ID || '' }}
       # 实例恢复和兼容性设置
       RECOVERY_ACTION: "RESTORE_INSTANCE"
       LEGACY_IMDS_ENDPOINTS: "false"

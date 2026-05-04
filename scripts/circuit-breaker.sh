@@ -22,13 +22,13 @@ get_ad_failure_data() {
     if command -v gh >/dev/null 2>&1; then
         failure_data=$(gh variable get "$AD_FAILURE_DATA_VAR" 2>/dev/null || echo "[]")
     else
-        log_debug "GitHub CLI not available - using empty failure data"
+        log_debug "GitHub CLI 不可用 - 使用空失败数据"
         failure_data="[]"
     fi
     
     # Validate JSON structure
     if ! echo "$failure_data" | jq empty 2>/dev/null; then
-        log_warning "Invalid failure data format - resetting to empty array"
+        log_warning "失败数据格式无效 - 重置为空数组"
         failure_data="[]"
     fi
     
@@ -96,7 +96,7 @@ should_skip_ad() {
                 hours_diff=$(( (current_epoch - last_epoch) / 3600 ))
                 
                 if [[ $hours_diff -ge $CIRCUIT_BREAKER_RESET_HOURS ]]; then
-                    log_info "Circuit breaker reset for AD $ad after ${hours_diff} hours"
+                    log_info "AD $ad 熔断器已重置（${hours_diff} 小时后）"
                     reset_ad_failures "$ad"
                     return 1  # Don't skip - circuit breaker reset
                 fi
@@ -104,7 +104,7 @@ should_skip_ad() {
         fi
     fi
     
-    log_warning "Circuit breaker OPEN for AD $ad (${failure_count} consecutive failures)"
+    log_warning "AD $ad 熔断器开启（连续 ${failure_count} 次失败）"
     return 0  # Skip this AD
 }
 
@@ -128,7 +128,7 @@ increment_ad_failure() {
         ' 2>/dev/null)
         
         if [[ -z "$updated_data" ]]; then
-            log_warning "Failed to update failure data with jq - creating new record"
+            log_warning "jq 更新失败数据失败 - 创建新记录"
             updated_data="[{\"ad\":\"$ad\",\"failures\":1,\"last_failure\":\"$current_time\"}]"
         fi
     else
@@ -140,19 +140,19 @@ increment_ad_failure() {
     if command -v gh >/dev/null 2>&1; then
         while [[ $retry_count -lt $max_retries ]]; do
             if echo "$updated_data" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>/dev/null; then
-                log_debug "Updated AD failure data for $ad"
+                log_debug "已更新 AD $ad 的失败数据"
                 return 0
             else
                 retry_count=$((retry_count + 1))
-                log_warning "Failed to update AD failure data (attempt $retry_count/$max_retries)"
+                log_warning "更新 AD 失败数据失败（第 $retry_count/$max_retries 次尝试）"
                 sleep 2
             fi
         done
         
-        log_error "Failed to persist AD failure data after $max_retries attempts"
+        log_error "在 $max_retries 次尝试后仍无法持久化 AD 失败数据"
         return 1
     else
-        log_debug "GitHub CLI not available - failure data not persisted"
+        log_debug "GitHub CLI 不可用 - 失败数据未持久化"
         return 0
     fi
 }
@@ -170,9 +170,9 @@ reset_ad_failures() {
         
         if [[ -n "$updated_data" ]] && command -v gh >/dev/null 2>&1; then
             if echo "$updated_data" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>/dev/null; then
-                log_info "Reset failure tracking for AD $ad"
+                log_info "已重置 AD $ad 的失败追踪"
             else
-                log_warning "Failed to reset AD failure data"
+                log_warning "重置 AD 失败数据失败"
             fi
         fi
     fi
@@ -181,9 +181,9 @@ reset_ad_failures() {
 reset_all_ad_failures() {
     if command -v gh >/dev/null 2>&1; then
         if echo "[]" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>/dev/null; then
-            log_info "Reset all AD failure tracking data"
+            log_info "已重置所有 AD 失败追踪数据"
         else
-            log_warning "Failed to reset all AD failure data"
+            log_warning "重置所有 AD 失败数据失败"
         fi
     fi
 }
@@ -201,7 +201,7 @@ get_available_ads() {
         ad=$(echo "$ad" | xargs)
         
         if should_skip_ad "$ad"; then
-            log_info "Skipping AD $ad (circuit breaker open)"
+            log_info "跳过 AD $ad（熔断器开启）"
             continue
         fi
         
@@ -218,7 +218,7 @@ get_available_ads() {
 # Function to be called after successful AD usage
 mark_ad_success() {
     local ad="$1"
-    log_debug "Marking AD $ad as successful - resetting failure tracking"
+    log_debug "标记 AD $ad 为成功 - 重置失败追踪"
     reset_ad_failures "$ad"
 }
 
@@ -231,7 +231,7 @@ show_circuit_breaker_status() {
     
     if command -v jq >/dev/null 2>&1; then
         ad_count=$(echo "$failure_data" | jq length)
-        log_info "Circuit breaker status: $ad_count ADs with failure tracking"
+        log_info "熔断器状态: $ad_count 个 AD 有失败追踪记录"
         
         if [[ $ad_count -gt 0 ]]; then
             echo "$failure_data" | jq -r '.[] | "\(.ad): \(.failures) failures, last: \(.last_failure)"' | while read -r line; do
@@ -239,7 +239,7 @@ show_circuit_breaker_status() {
             done
         fi
     else
-        log_info "Circuit breaker status: jq not available for detailed status"
+        log_info "熔断器状态: jq 不可用，无法显示详细信息"
     fi
 }
 

@@ -8,7 +8,7 @@ set -euo pipefail
 source "$(dirname "$0")/utils.sh"
 
 validate_oci_configuration() {
-    log_info "Validating OCI configuration..."
+    log_info "正在验证 OCI 配置..."
     
     # Required OCI configuration
     require_env_var "OCI_USER_OCID"
@@ -41,11 +41,11 @@ validate_oci_configuration() {
         die "Invalid OCI_IMAGE_ID format: $OCI_IMAGE_ID"
     fi
     
-    log_success "OCI configuration validation passed"
+    log_success "OCI 配置验证通过"
 }
 
 validate_instance_configuration() {
-    log_info "Validating instance configuration..."
+    log_info "正在验证实例配置..."
     
     # Required instance configuration with defaults
     export OCI_AD="${OCI_AD:-fgaj:AP-SINGAPORE-1-AD-1}"
@@ -98,7 +98,7 @@ validate_instance_configuration() {
             die "OCI_MEMORY_IN_GBS must be a positive integer, got: $OCI_MEMORY_IN_GBS"
         fi
         
-        log_info "Flexible shape configuration: ${OCI_OCPUS} OCPUs, ${OCI_MEMORY_IN_GBS}GB RAM"
+        log_info "弹性形状配置: ${OCI_OCPUS} OCPU, ${OCI_MEMORY_IN_GBS}GB 内存"
     fi
     
     # Validate boolean values
@@ -132,7 +132,7 @@ validate_instance_configuration() {
         if ! [[ "$OCI_AD" =~ ^[a-zA-Z0-9:._-]+(,[a-zA-Z0-9:._-]+)*$ ]]; then
             die "OCI_AD format invalid. Expected comma-separated AD names, got: $OCI_AD"
         fi
-        log_debug "AD format validation passed for: $OCI_AD"
+        log_debug "AD 格式验证通过: $OCI_AD"
     fi
     
     # Validate recovery action
@@ -140,31 +140,31 @@ validate_instance_configuration() {
         die "RECOVERY_ACTION must be 'RESTORE_INSTANCE' or 'STOP_INSTANCE', got: $RECOVERY_ACTION"
     fi
     
-    log_success "Instance configuration validation passed"
+    log_success "实例配置验证通过"
 }
 
 validate_ssh_configuration() {
-    log_info "Validating SSH configuration..."
+    log_info "正在验证 SSH 配置..."
     
     require_env_var "INSTANCE_SSH_PUBLIC_KEY"
     
     # Basic SSH public key format validation
     if ! echo "$INSTANCE_SSH_PUBLIC_KEY" | grep -q "^ssh-"; then
-        log_warning "SSH public key doesn't start with 'ssh-', this may cause issues"
+        log_warning "SSH 公钥不以 'ssh-' 开头，可能导致问题"
     fi
     
-    log_success "SSH configuration validation passed"
+    log_success "SSH 配置验证通过"
 }
 
 validate_notification_configuration() {
-    log_info "Validating notification configuration..."
+    log_info "正在验证通知配置..."
     
     require_env_var "TELEGRAM_TOKEN"
     require_env_var "TELEGRAM_USER_ID"
     
     # Basic Telegram token format validation (should be numeric:alphanumeric)
     if ! [[ "$TELEGRAM_TOKEN" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]]; then
-        log_warning "Telegram token format may be invalid"
+        log_warning "Telegram 令牌格式可能无效"
     fi
     
     # Telegram user ID should be numeric
@@ -172,14 +172,14 @@ validate_notification_configuration() {
         die "TELEGRAM_USER_ID must be numeric, got: $TELEGRAM_USER_ID"
     fi
     
-    log_success "Notification configuration validation passed"
+    log_success "通知配置验证通过"
 }
 
 validate_proxy_configuration() {
-    log_info "Validating proxy configuration..."
+    log_info "正在验证代理配置..."
     
     if [[ -z "${OCI_PROXY_URL:-}" ]]; then
-        log_debug "No proxy URL provided - skipping proxy validation"
+        log_debug "未提供代理 URL - 跳过代理验证"
         return 0
     fi
     
@@ -205,12 +205,12 @@ validate_proxy_configuration() {
         die "Invalid proxy port: $port (must be between 1-65535)"
     fi
     
-    log_success "Proxy URL format validation passed"
+    log_success "代理 URL 格式验证通过"
     parse_and_configure_proxy true
 }
 
 print_configuration_summary() {
-    log_info "Configuration Summary:"
+    log_info "配置摘要:"
     echo "  Region: $OCI_REGION"
     echo "  Availability Domain(s): $OCI_AD"
     echo "  Shape: $OCI_SHAPE"
@@ -230,7 +230,7 @@ print_configuration_summary() {
 
 # Validate constants from constants.sh are within acceptable ranges
 validate_constants_configuration() {
-    log_info "Validating centralized constants..."
+    log_info "正在验证集中常量..."
     
     # Validate GitHub Actions timeout is within billing boundary
     if [[ "$GITHUB_ACTIONS_BILLING_TIMEOUT" -ge "$GITHUB_ACTIONS_BILLING_BOUNDARY" ]]; then
@@ -253,12 +253,12 @@ validate_constants_configuration() {
         die "BOOT_VOLUME_SIZE_DEFAULT ($BOOT_VOLUME_SIZE_DEFAULT) cannot be less than minimum ($BOOT_VOLUME_SIZE_MIN)"
     fi
     
-    log_success "Constants configuration validation passed"
+    log_success "常量配置验证通过"
 }
 
 # Main validation function
 validate_all_configuration() {
-    log_info "Starting configuration validation..."
+    log_info "开始配置验证..."
     
     # Validate centralized constants first
     validate_constants_configuration
@@ -276,7 +276,7 @@ validate_all_configuration() {
     
     print_configuration_summary
     
-    log_success "All configuration validation completed successfully"
+    log_success "所有配置验证通过"
 }
 
 # Run validation if called directly

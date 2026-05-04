@@ -14,7 +14,7 @@ METRICS_FILE="${TMPDIR:-/tmp}/oci_ad_metrics_$$"
 init_metrics() {
     # Create temporary metrics file
     echo "# OCI AD Metrics - $(date '+%Y-%m-%d %H:%M:%S')" > "$METRICS_FILE"
-    log_debug "Initialized AD metrics tracking: $METRICS_FILE"
+    log_debug "已初始化 AD 指标追踪: $METRICS_FILE"
 }
 
 # Record AD attempt result
@@ -34,17 +34,17 @@ record_ad_result() {
     local entry="${timestamp}|${ad_name}|${result}|${error_type}"
     echo "$entry" >> "$METRICS_FILE"
     
-    log_debug "Recorded AD result: $ad_name -> $result${error_type:+ ($error_type)}"
+    log_debug "已记录 AD 结果: $ad_name -> $result${error_type:+ ($error_type)}"
 }
 
 # Get AD success rate summary
 show_ad_metrics() {
     if [[ ! -f "$METRICS_FILE" ]]; then
-        log_info "No AD metrics available for this run"
+        log_info "本次运行无 AD 指标数据"
         return
     fi
     
-    log_info "=== AD Performance Summary ==="
+    log_info "=== AD 性能摘要 ==="
     
     # Count results by AD
     local ad_stats
@@ -95,7 +95,7 @@ show_ad_metrics() {
             log_info "$line"
         done
     else
-        log_info "No AD attempts recorded"
+        log_info "无 AD 尝试记录"
     fi
 }
 
@@ -138,7 +138,7 @@ get_optimal_ad() {
 cleanup_metrics() {
     if [[ -f "$METRICS_FILE" ]]; then
         rm -f "$METRICS_FILE"
-        log_debug "Cleaned up metrics file"
+        log_debug "已清理指标文件"
     fi
 }
 
@@ -180,7 +180,7 @@ record_api_response_time() {
     
     # Alert on slow responses (>5000ms)
     if [[ "$response_time_ms" -gt 5000 ]]; then
-        log_warning "Slow API response detected: $operation took ${response_time_ms}ms"
+        log_warning "API 响应缓慢: $operation 耗时 ${response_time_ms}ms"
     fi
 }
 
@@ -195,12 +195,12 @@ record_execution_phase() {
     case "$phase_name" in
         "parallel_execution")
             if [[ "$duration_seconds" -gt 30 ]]; then
-                log_warning "Parallel execution took ${duration_seconds}s (>30s may indicate issues)"
+                log_warning "并行执行耗时 ${duration_seconds}s（>30s 可能存在问题）"
             fi
             ;;
         "setup")
             if [[ "$duration_seconds" -gt 10 ]]; then
-                log_warning "Setup phase took ${duration_seconds}s (>10s may indicate network issues)"
+                log_warning "初始化阶段耗时 ${duration_seconds}s（>10s 可能存在网络问题）"
             fi
             ;;
     esac
@@ -266,7 +266,7 @@ dashboard_queries:
     visualization: "bar_chart"
 EOF
 
-    log_info "Performance dashboard template generated: $output_file"
+    log_info "性能仪表板模板已生成: $output_file"
 }
 
 # Export all functions for use by other scripts

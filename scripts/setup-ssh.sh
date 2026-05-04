@@ -8,7 +8,7 @@ set -euo pipefail
 source "$(dirname "$0")/utils.sh"
 
 setup_ssh_config() {
-    log_info "Setting up SSH configuration..."
+    log_info "正在配置 SSH..."
     
     # Validate required environment variable
     require_env_var "INSTANCE_SSH_PUBLIC_KEY"
@@ -20,7 +20,7 @@ setup_ssh_config() {
     echo "${INSTANCE_SSH_PUBLIC_KEY}" > ~/.ssh/private_key_pub.pem
     chmod 644 ~/.ssh/private_key_pub.pem
     
-    log_success "SSH public key configured successfully"
+    log_success "SSH 公钥配置完成"
 }
 
 # Run setup if called directly

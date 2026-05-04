@@ -56,8 +56,9 @@
 | `OCI_PROXY_URL` | ❌ | 代理 URL（支持 IPv4/IPv6） |
 | `OCI_AD` | ❌ | 可用域（默认 `fgaj:AP-SINGAPORE-1-AD-1`） |
 | `OCI_REGION_TIMEZONE` | ❌ | 区域时区（默认 `Asia/Singapore`） |
-| `OCI_BOOT_VOLUME_ID` | ❌ | 通用引导卷 OCID（留空则创建新引导卷） |
-| `OCI_A1_BOOT_VOLUME_ID` | ❌ | A1.Flex 专用引导卷 OCID（留空则创建新引导卷） |
+| `OCI_BOOT_VOLUME_ID` | ❌ | 通用引导卷 OCID（形状专用 ID 未设置时回退使用） |
+| `OCI_A1_BOOT_VOLUME_ID` | ❌ | A1.Flex 专用引导卷 OCID（优先于通用 ID） |
+| `OCI_E2_BOOT_VOLUME_ID` | ❌ | E2.Micro 专用引导卷 OCID（优先于通用 ID） |
 
 ### 3. 启用 GitHub Actions
 
@@ -163,7 +164,17 @@
 
 > **也可以用其他方式获取**：在 Telegram 中搜索 `@RawDataBot`，发送消息后它会返回包含你 `from.id` 的 JSON。
 
-### 十、引导卷 OCID (`OCI_A1_BOOT_VOLUME_ID`，可选)
+### 十、引导卷 OCID（可选）
+
+引导卷有 3 个 Secrets，优先级从高到低：
+
+| Secret | 用途 |
+|--------|------|
+| `OCI_A1_BOOT_VOLUME_ID` | A1.Flex 专用引导卷 |
+| `OCI_E2_BOOT_VOLUME_ID` | E2.Micro 专用引导卷 |
+| `OCI_BOOT_VOLUME_ID` | 通用引导卷（形状专用未设置时回退） |
+
+获取步骤：
 
 1. 登录 Oracle Cloud 控制台
 2. 导航到 **存储 → 块存储 → 引导卷**
@@ -196,9 +207,13 @@
 2. 获取引导卷的 OCID
 3. 在 GitHub Secrets 中添加：
 
-| Secret | 值 |
-|--------|---|
-| `OCI_A1_BOOT_VOLUME_ID` | `ocid1.bootvolume.oc1.us-sanjose-1.xxxxxx` |
+| Secret | 说明 |
+|--------|------|
+| `OCI_A1_BOOT_VOLUME_ID` | A1.Flex 专用引导卷（优先级最高） |
+| `OCI_E2_BOOT_VOLUME_ID` | E2.Micro 专用引导卷（优先级最高） |
+| `OCI_BOOT_VOLUME_ID` | 通用引导卷（形状专用 ID 未设置时回退使用） |
+
+> **优先级**：形状专用 ID > 通用 ID > 创建新引导卷。例如设置了 `OCI_A1_BOOT_VOLUME_ID`，A1.Flex 会使用它；如果只设置了 `OCI_BOOT_VOLUME_ID`，则 A1.Flex 和 E2.Micro 都会使用同一个引导卷。
 
 脚本会自动：
 - 跳过镜像查找（不需要新镜像）

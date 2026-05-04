@@ -102,7 +102,7 @@ declare -A A1_FLEX_CONFIG=(
     ["OCPUS"]="4"
     ["MEMORY_IN_GBS"]="24"
     ["DISPLAY_NAME"]="a1-flex-sg"
-    ["BOOT_VOLUME_ID"]="${A1_BOOT_VOLUME_ID:-}"
+    ["BOOT_VOLUME_ID"]="${A1_BOOT_VOLUME_ID:-${BOOT_VOLUME_ID:-}}"
 )
 
 # shellcheck disable=SC2034  # Used via nameref in launch_shape()
@@ -111,6 +111,7 @@ declare -A E2_MICRO_CONFIG=(
     ["OCPUS"]=""
     ["MEMORY_IN_GBS"]=""
     ["DISPLAY_NAME"]="e2-micro-sg"
+    ["BOOT_VOLUME_ID"]="${E2_BOOT_VOLUME_ID:-${BOOT_VOLUME_ID:-}}"
 )
 
 # Verify actual instance existence by querying OCI API
@@ -605,8 +606,22 @@ main() {
             log_debug "Skipping verification - no successful instances to verify"
         fi
     fi
-    # Cleanup temporary files
-    rm -rf "$temp_dir" 2>/dev/null || true
+    # Collect shape-specific durations for analysis (before cleanup)
+    local a1_duration=0 e2_duration=0 peak_memory=0
+    if [[ -n "${temp_dir:-}" && -f "${temp_dir}/a1.flex_duration" ]]; then
+        a1_duration=$(cat "${temp_dir}/a1.flex_duration" 2>/dev/null || echo "0")
+    fi
+    if [[ -n "${temp_dir:-}" && -f "${temp_dir}/e2.1.micro_duration" ]]; then
+        e2_duration=$(cat "${temp_dir}/e2.1.micro_duration" 2>/dev/null || echo "0")
+    fi
+    if [[ -n "${temp_dir:-}" && -f "${temp_dir}/peak_memory_usage" ]]; then
+        peak_memory=$(cat "${temp_dir}/peak_memory_usage" 2>/dev/null || echo "0")
+    fi
+
+    # Cleanup temporary files (after data collection)
+    if [[ -n "${temp_dir:-}" && -d "${temp_dir:-}" ]]; then
+        rm -rf "$temp_dir" 2>/dev/null || true
+    fi
 
     # Log results
     if [[ $STATUS_A1 -eq 0 ]]; then
@@ -651,18 +666,6 @@ main() {
 
     # Track final resource usage and collect detailed performance summary
     track_resource_usage "end"
-
-    # Collect shape-specific durations for analysis
-    local a1_duration=0 e2_duration=0 peak_memory=0
-    if [[ -f "${temp_dir}/a1.flex_duration" ]]; then
-        a1_duration=$(cat "${temp_dir}/a1.flex_duration" 2>/dev/null || echo "0")
-    fi
-    if [[ -f "${temp_dir}/e2.1.micro_duration" ]]; then
-        e2_duration=$(cat "${temp_dir}/e2.1.micro_duration" 2>/dev/null || echo "0")
-    fi
-    if [[ -f "${temp_dir}/peak_memory_usage" ]]; then
-        peak_memory=$(cat "${temp_dir}/peak_memory_usage" 2>/dev/null || echo "0")
-    fi
 
     # Log comprehensive execution summary
     local performance_summary="ExecutionTime=${elapsed}s,A1Duration=${a1_duration}s,E2Duration=${e2_duration}s"

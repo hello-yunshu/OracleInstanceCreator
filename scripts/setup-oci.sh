@@ -8,7 +8,7 @@ set -euo pipefail
 source "$(dirname "$0")/utils.sh"
 
 setup_oci_config() {
-    log_info "Setting up OCI configuration..."
+    log_info "正在配置 OCI..."
     
     # Validate required environment variables
     require_env_var "OCI_USER_OCID"
@@ -31,19 +31,19 @@ key_file=${HOME}/.oci/oci_api_key.pem
 EOL
     
     chmod 600 ~/.oci/config
-    log_info "OCI config file created"
+    log_info "OCI 配置文件已创建"
     
     # Create OCI private key file
     echo "${OCI_PRIVATE_KEY}" > ~/.oci/oci_api_key.pem
     chmod 600 ~/.oci/oci_api_key.pem
-    log_info "OCI private key file created"
+    log_info "OCI 私钥文件已创建"
     
-    log_success "OCI configuration completed successfully"
+    log_success "OCI 配置完成"
 }
 
 # Setup proxy configuration
 setup_proxy_config() {
-    log_info "Setting up proxy configuration..."
+    log_info "正在配置代理..."
     parse_and_configure_proxy false
 }
 
