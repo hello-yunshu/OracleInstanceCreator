@@ -79,11 +79,5 @@ regexes = [
     # Allow documentation examples
     "-----BEGIN PRIVATE KEY-----",
     "user:pass@host:port",
-    "user:pass@\\[host\\]:port",
-    # Allow cached Oracle Linux image OCIDs (public, non-sensitive)
-    "ocid1\\.image\\.oc1\\.ap-singapore-1\\.",
-    # Allow example boot volume OCIDs in documentation
-    "ocid1\\.bootvolume\\.oc1\\.",
-    # Allow variable reference patterns
-    "\\$\\{secrets\\."
+    "user:pass@\\[host\\]:port"
 ]

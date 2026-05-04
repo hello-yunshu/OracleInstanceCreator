@@ -45,58 +45,58 @@ generate_cron_patterns() {
     case "$region" in
         # Singapore: Business hours 9am-6pm SGT = 1am-10am UTC
         "ap-singapore-1")
-            echo "# 新加坡优化调度"
-            echo "# 离峰激进: 2-7am UTC (新加坡时间 10am-3pm - 午餐/低活跃)"
+            echo "# Singapore-optimized schedule"
+            echo "# Off-peak aggressive: 2-7am UTC (10am-3pm SGT - lunch/low activity)"
             echo 'schedule_aggressive: "*/15 2-7 * * *"'
-            echo "# 高峰保守: 8am-1am UTC (新加坡时间 4pm-9am - 避开高峰)"
+            echo "# Peak conservative: 8am-1am UTC (4pm-9am SGT - avoid peak business)" 
             echo 'schedule_conservative: "0 8-23,0-1 * * *"'
-            echo "# 周末增强: 1-6am UTC 周末 (新加坡时间 9am-2pm - 低需求)"
+            echo "# Weekend boost: 1-6am UTC weekends (9am-2pm SGT - lower demand)"
             echo 'schedule_weekend: "*/20 1-6 * * 6,0"'
             ;;
         
         # Mumbai: Business hours 9am-6pm IST = 3:30am-12:30pm UTC
         "ap-mumbai-1")
-            echo "# 孟买优化调度"
-            echo "# 离峰激进: 13-18 UTC (IST 6:30pm-11:30pm - 晚间低谷)"
+            echo "# Mumbai-optimized schedule"
+            echo "# Off-peak aggressive: 13-18 UTC (6:30pm-11:30pm IST - evening low)"
             echo 'schedule_aggressive: "*/15 13-18 * * *"'
-            echo "# 高峰保守: 其他时段"
+            echo "# Peak conservative: Other hours"
             echo 'schedule_conservative: "0 19-23,0-12 * * *"'
             echo 'schedule_weekend: "*/20 1-6 * * 6,0"'
             ;;
             
         # US East: Business hours 9am-6pm EST = 2pm-11pm UTC  
         "us-east-1"|"ca-central-1")
-            echo "# 美东优化调度"
-            echo "# 离峰激进: 6-12 UTC (EST 1am-7am - 夜间时段)"
+            echo "# US East-optimized schedule"
+            echo "# Off-peak aggressive: 6-12 UTC (1am-7am EST - night hours)"
             echo 'schedule_aggressive: "*/15 6-12 * * *"'
-            echo "# 高峰保守: 13-5 UTC (EST 8am-12am - 避开工作/晚间)"
+            echo "# Peak conservative: 13-5 UTC (8am-12am EST - avoid business/evening)"
             echo 'schedule_conservative: "0 13-23,0-5 * * *"'
             echo 'schedule_weekend: "*/20 6-11 * * 6,0"'
             ;;
             
         # US West (San Jose/Phoenix): Business hours 9am-6pm PST = 5pm-2am UTC
         "us-sanjose-1"|"us-phoenix-1")
-            echo "# 美西优化调度"
-            echo "# 离峰激进: 13-20 UTC (PST 5am-12pm - 早晨低谷)"
+            echo "# US West-optimized schedule"
+            echo "# Off-peak aggressive: 13-20 UTC (5am-12pm PST - morning low)"
             echo 'schedule_aggressive: "*/15 13-20 * * *"'
-            echo "# 高峰保守: 21-12 UTC (PST 1pm-4am - 避开工作/晚间)"
+            echo "# Peak conservative: 21-12 UTC (1pm-4am PST - avoid business/evening)"
             echo 'schedule_conservative: "0 21-23,0-12 * * *"'
             echo 'schedule_weekend: "*/20 13-19 * * 6,0"'
             ;;
             
         # Europe: Business hours 9am-6pm CET = 8am-5pm UTC
         "eu-frankfurt-1"|"eu-amsterdam-1")
-            echo "# 欧洲 CET 优化调度"
-            echo "# 离峰激进: 18-23 UTC (CET 7pm-12am - 晚间低谷)"
+            echo "# Europe CET-optimized schedule" 
+            echo "# Off-peak aggressive: 18-23 UTC (7pm-12am CET - evening low)"
             echo 'schedule_aggressive: "*/15 18-23 * * *"'
-            echo "# 高峰保守: 0-17 UTC (CET 1am-6pm - 避开工作时间)"
+            echo "# Peak conservative: 0-17 UTC (1am-6pm CET - avoid business)"
             echo 'schedule_conservative: "0 0-7,9-17 * * *"'
             echo 'schedule_weekend: "*/20 18-23 * * 6,0"'
             ;;
             
         *)
-            log_warning "未知区域 $region，使用美西默认值"
-            echo "# 默认美西优化调度"
+            log_warning "未知区域 $region，使用新加坡默认值"
+            echo "# Default Singapore-optimized schedule"
             echo 'schedule_aggressive: "*/15 2-7 * * *"'
             echo 'schedule_conservative: "0 8-23,0-1 * * *"'
             echo 'schedule_weekend: "*/20 1-6 * * 6,0"'
@@ -126,13 +126,13 @@ calculate_monthly_usage() {
     local monthly_runs=$((22 * weekday_runs + 4 * weekend_runs))
     local monthly_minutes=$monthly_runs  # Each run bills as 1 minute minimum
     
-    echo "预计月度用量: $monthly_runs 次运行 = $monthly_minutes 分钟"
+    echo "Expected monthly usage: $monthly_runs runs = $monthly_minutes minutes"
     
     if [[ $monthly_minutes -lt 2000 ]]; then
-        echo "✅ 在免费额度内（2000 分钟）"
-        echo "剩余缓冲: $((2000 - monthly_minutes)) 分钟"
+        echo "✅ Within free tier limit (2000 minutes)"
+        echo "Buffer remaining: $((2000 - monthly_minutes)) minutes"
     else
-        echo "❌ 超出免费额度 $((monthly_minutes - 2000)) 分钟"
+        echo "❌ Exceeds free tier limit by $((monthly_minutes - 2000)) minutes"
     fi
 }
 
@@ -171,7 +171,7 @@ recommend_adjustments() {
             
             if [[ -n "$success_hours" ]]; then
                 log_info "按小时统计的历史成功 (UTC): $success_hours"
-                log_info "💡 考虑在成功时段集中尝试"
+                log_info "💡 Consider concentrating attempts during successful hours"
             else
                 log_info "尚无历史成功数据"
             fi

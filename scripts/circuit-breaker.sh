@@ -10,38 +10,6 @@ source "$(dirname "$0")/constants.sh"
 readonly MAX_CONSECUTIVE_FAILURES=3
 readonly CIRCUIT_BREAKER_RESET_HOURS=24
 readonly AD_FAILURE_DATA_VAR="AD_FAILURE_DATA"
-readonly AD_FAILURE_LOCAL_FILE="${HOME}/.oci_ad_failure_data.json"
-
-save_ad_failure_local() {
-    local ad="$1"
-    local data="$2"
-    
-    if [[ -z "$data" ]]; then
-        return 1
-    fi
-    
-    local dir
-    dir=$(dirname "$AD_FAILURE_LOCAL_FILE" 2>/dev/null)
-    if [[ -n "$dir" ]] && [[ "$dir" != "." ]]; then
-        mkdir -p "$dir" 2>/dev/null
-    fi
-    
-    if echo "$data" > "$AD_FAILURE_LOCAL_FILE" 2>/dev/null; then
-        log_debug "AD 失败数据已保存到本地文件: $AD_FAILURE_LOCAL_FILE"
-        return 0
-    else
-        log_warning "无法保存 AD 失败数据到本地文件"
-        return 1
-    fi
-}
-
-load_ad_failure_local() {
-    if [[ -f "$AD_FAILURE_LOCAL_FILE" ]]; then
-        cat "$AD_FAILURE_LOCAL_FILE" 2>/dev/null
-    else
-        echo "[]"
-    fi
-}
 
 # Track AD failure counts in GitHub variables for persistence
 # Data format: JSON array of objects with ad, failures, last_failure_time
@@ -50,21 +18,15 @@ load_ad_failure_local() {
 get_ad_failure_data() {
     local failure_data=""
     
-    if [[ -n "${GITHUB_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
+    # Try to get existing failure data from GitHub variables
+    if command -v gh >/dev/null 2>&1; then
         failure_data=$(gh variable get "$AD_FAILURE_DATA_VAR" 2>/dev/null || echo "[]")
-        if [[ "$failure_data" == "[]" ]] || [[ -z "$failure_data" ]]; then
-            local local_data
-            local_data=$(load_ad_failure_local)
-            if [[ "$local_data" != "[]" ]] && [[ -n "$local_data" ]]; then
-                log_debug "GitHub 变量为空，尝试从本地文件合并失败数据"
-                failure_data="$local_data"
-            fi
-        fi
     else
-        log_debug "GitHub CLI 或 GITHUB_TOKEN 不可用 - 尝试从本地文件加载失败数据"
-        failure_data=$(load_ad_failure_local)
+        log_debug "GitHub CLI 不可用 - 使用空失败数据"
+        failure_data="[]"
     fi
     
+    # Validate JSON structure
     if ! echo "$failure_data" | jq empty 2>/dev/null; then
         log_warning "失败数据格式无效 - 重置为空数组"
         failure_data="[]"
@@ -175,26 +137,22 @@ increment_ad_failure() {
     fi
     
     # Store updated data in GitHub variables with retry logic
-    if [[ -n "${GITHUB_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
+    if command -v gh >/dev/null 2>&1; then
         while [[ $retry_count -lt $max_retries ]]; do
-            local gh_error
-            gh_error=$(echo "$updated_data" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>&1 1>/dev/null)
-            if [[ $? -eq 0 ]]; then
+            if echo "$updated_data" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>/dev/null; then
                 log_debug "已更新 AD $ad 的失败数据"
                 return 0
             else
                 retry_count=$((retry_count + 1))
-                log_warning "更新 AD 失败数据失败（第 $retry_count/$max_retries 次尝试）: ${gh_error:0:200}"
+                log_warning "更新 AD 失败数据失败（第 $retry_count/$max_retries 次尝试）"
                 sleep 2
             fi
         done
         
         log_error "在 $max_retries 次尝试后仍无法持久化 AD 失败数据"
-        save_ad_failure_local "$ad" "$updated_data"
         return 1
     else
-        log_debug "GitHub CLI 或 GITHUB_TOKEN 不可用 - 失败数据未持久化到 GitHub"
-        save_ad_failure_local "$ad" "$updated_data"
+        log_debug "GitHub CLI 不可用 - 失败数据未持久化"
         return 0
     fi
 }
@@ -210,7 +168,7 @@ reset_ad_failures() {
         # Remove AD from failure tracking
         updated_data=$(echo "$failure_data" | jq --arg ad "$ad" 'map(select(.ad != $ad))' 2>/dev/null)
         
-        if [[ -n "$updated_data" ]] && [[ -n "${GITHUB_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
+        if [[ -n "$updated_data" ]] && command -v gh >/dev/null 2>&1; then
             if echo "$updated_data" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>/dev/null; then
                 log_info "已重置 AD $ad 的失败追踪"
             else
@@ -221,7 +179,7 @@ reset_ad_failures() {
 }
 
 reset_all_ad_failures() {
-    if [[ -n "${GITHUB_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
+    if command -v gh >/dev/null 2>&1; then
         if echo "[]" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>/dev/null; then
             log_info "已重置所有 AD 失败追踪数据"
         else
@@ -291,5 +249,3 @@ export -f increment_ad_failure
 export -f mark_ad_success
 export -f get_available_ads
 export -f show_circuit_breaker_status
-export -f save_ad_failure_local
-export -f load_ad_failure_local

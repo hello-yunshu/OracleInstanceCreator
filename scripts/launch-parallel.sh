@@ -21,6 +21,8 @@ source "$(dirname "$0")/state-manager.sh"
 PID_A1=""
 PID_E2=""
 temp_dir=""
+A1_VERIFIED=true
+E2_VERIFIED=true
 
 # Performance monitoring functions
 get_memory_usage() {
@@ -312,12 +314,14 @@ verify_and_update_state() {
         
         if [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
             log_info "已验证 A1.Flex 实例存在: $a1_instance_id"
+            A1_VERIFIED=true
             if ! record_instance_verification "${A1_FLEX_CONFIG[DISPLAY_NAME]}" "$a1_instance_id" "verified" "$state_file"; then
                 log_warning "记录 A1.Flex 实例验证失败"
                 ((verification_errors++))
             fi
         else
-            log_warning "A1.Flex 实例创建报告成功但 API 未找到实例（可能需要更长时间出现在 API 中）"
+            log_warning "A1.Flex 实例创建报告成功但 API 未找到实例 - 降级为容量错误"
+            A1_VERIFIED=false
             ((verification_errors++))
         fi
     fi
@@ -329,12 +333,14 @@ verify_and_update_state() {
         
         if [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
             log_info "已验证 E2.Micro 实例存在: $e2_instance_id"
+            E2_VERIFIED=true
             if ! record_instance_verification "${E2_MICRO_CONFIG[DISPLAY_NAME]}" "$e2_instance_id" "verified" "$state_file"; then
                 log_warning "记录 E2.Micro 实例验证失败"
                 ((verification_errors++))
             fi
         else
-            log_warning "E2.Micro 实例创建报告成功但 API 未找到实例（可能需要更长时间出现在 API 中）"
+            log_warning "E2.Micro 实例创建报告成功但 API 未找到实例 - 降级为容量错误"
+            E2_VERIFIED=false
             ((verification_errors++))
         fi
     fi
@@ -395,10 +401,10 @@ get_instance_details() {
     # Format the details
     echo "**${shape_name}** (${shape}):
 • ID: ${id}
-• 公网 IP: ${public_ip}
-• 内网 IP: ${private_ip}
-• 可用性域: ${ad}
-• 状态: ${state}"
+• Public IP: ${public_ip}
+• Private IP: ${private_ip}
+• AD: ${ad}
+• State: ${state}"
 }
 
 # Main parallel execution
@@ -706,13 +712,21 @@ main() {
         rm -rf "$temp_dir" 2>/dev/null || true
     fi
 
+    # Downgrade statuses based on verification results
+    # If a shape reported success but verification couldn't find the instance,
+    # it means the instance was never actually created - downgrade to capacity error
+    if [[ $STATUS_A1 -eq 0 && "$A1_VERIFIED" == "false" ]]; then
+        log_warning "A1.Flex 验证失败 - 将状态从成功降级为容量不足"
+        STATUS_A1=$OCI_EXIT_CAPACITY_ERROR
+    fi
+    if [[ $STATUS_E2 -eq 0 && "$E2_VERIFIED" == "false" ]]; then
+        log_warning "E2.1.Micro 验证失败 - 将状态从成功降级为容量不足"
+        STATUS_E2=$OCI_EXIT_CAPACITY_ERROR
+    fi
+
     # Log results
     if [[ $STATUS_A1 -eq 0 ]]; then
         log_success "A1.Flex (ARM) 实例创建: 成功"
-    elif [[ $STATUS_A1 -eq $OCI_EXIT_CAPACITY_ERROR ]]; then
-        log_info "A1.Flex (ARM) 实例创建: 容量不足（将在下次调度时重试）"
-    elif [[ $STATUS_A1 -eq $OCI_EXIT_USER_LIMIT_ERROR ]]; then
-        log_info "A1.Flex (ARM) 实例创建: 已达用户限额"
     elif [[ $STATUS_A1 -eq 124 ]]; then
         log_warning "A1.Flex (ARM) 实例创建: 超时"
     else
@@ -721,10 +735,6 @@ main() {
 
     if [[ $STATUS_E2 -eq 0 ]]; then
         log_success "E2.1.Micro (AMD) 实例创建: 成功"
-    elif [[ $STATUS_E2 -eq $OCI_EXIT_CAPACITY_ERROR ]]; then
-        log_info "E2.1.Micro (AMD) 实例创建: 容量不足（将在下次调度时重试）"
-    elif [[ $STATUS_E2 -eq $OCI_EXIT_USER_LIMIT_ERROR ]]; then
-        log_info "E2.1.Micro (AMD) 实例创建: 已达用户限额"
     elif [[ $STATUS_E2 -eq 124 ]]; then
         log_warning "E2.1.Micro (AMD) 实例创建: 超时"
     else
@@ -759,8 +769,8 @@ main() {
     track_resource_usage "end"
 
     # Log comprehensive execution summary
-    local performance_summary="执行时间=${elapsed}s,A1耗时=${a1_duration}s,E2耗时=${e2_duration}s"
-    performance_summary="${performance_summary},峰值内存=${peak_memory}MB,成功率=${success_count}/2"
+    local performance_summary="ExecutionTime=${elapsed}s,A1Duration=${a1_duration}s,E2Duration=${e2_duration}s"
+    performance_summary="${performance_summary},PeakMemory=${peak_memory}MB,SuccessRate=${success_count}/2"
     log_performance_metric "CONCURRENT_END" "parallel_execution" "$success_count" "2" "$performance_summary"
 
     # Log structured performance data for analysis
@@ -773,7 +783,7 @@ main() {
             parallel_efficiency=$((total_shape_duration * 100 / elapsed))
         fi
         performance_context="${performance_context},\"success_count\":${success_count},\"parallel_efficiency\":${parallel_efficiency}}"
-        log_with_context "info" "并行执行性能摘要" "$performance_context"
+        log_with_context "info" "Parallel execution performance summary" "$performance_context"
     fi
 
     # Verify actual instances exist before claiming success
@@ -823,11 +833,11 @@ main() {
             
             # Send notification with details if available, fallback to basic info
             if [[ -n "$notification_details" ]]; then
-                send_telegram_notification "success" "OCI 实例抢注成功！
+                send_telegram_notification "success" "OCI instance hunting success!
 
 $notification_details"
             else
-                send_telegram_notification "success" "OCI 实例创建成功: $shapes_created"
+                send_telegram_notification "success" "OCI instances created: $shapes_created"
             fi
         fi
 
@@ -837,45 +847,52 @@ $notification_details"
         log_info "$user_limit_failures 种形状已达用户限额 - 无需继续尝试"
         log_info "请考虑管理现有实例以释放新部署的容量"
         
-        # 通知策略: 用户限额不发送通知
-        # 用户限额是预期的免费层行为 - 正常运行
+        # Notification Policy: NO notifications for user limits
+        # User limits are EXPECTED free tier behavior - normal operation
+        # Per CLAUDE.md policy: "DO NOT send notifications for User limits reached (expected)"
         
-        return 0
+        return 0  # User limits are not failures - they're expected behavior
     elif [[ $rate_limit_failures -gt 0 && $((rate_limit_failures + success_count + capacity_failures + user_limit_failures)) -eq 2 ]]; then
+        # Rate limits encountered - this is expected Oracle behavior, no notifications needed
         log_info "$rate_limit_failures 种形状遇到 Oracle API 速率限制 - 将在下次调度运行时重试"
         log_info "这是 Oracle API 在高使用期间的正常行为，会自动恢复"
         
-        # 通知策略: 速率限制不发送通知
-        # 速率限制是高使用期间预期的 Oracle API 行为
+        # Notification Policy: NO notifications for rate limits  
+        # Rate limiting is EXPECTED Oracle API behavior during high usage periods
+        # Per CLAUDE.md policy: "DO NOT send notifications for Rate limiting (standard behavior)"
         
-        return 0
+        return 0  # Rate limits are not failures - they're expected behavior
     elif [[ $capacity_failures -eq 2 ]]; then
+        # Both failed due to Oracle capacity constraints - this is expected behavior
         log_info "两种形状因 Oracle 容量限制不可用 - 将在下次调度时重试"
         log_info "这是 Oracle Cloud 容量暂时耗尽时的正常行为"
 
-        # 通知策略: 容量限制不发送通知
-        # 容量限制是预期的运行状态，通过重试周期自动解决
+        # Notification Policy: NO notifications for Oracle capacity constraints
+        # Capacity constraints are EXPECTED operational conditions that resolve through retry cycles
+        # Per CLAUDE.md policy: "DO NOT send notifications for Oracle capacity unavailable (expected)"
         
-        return 0
+        return 0 # Don't treat capacity exhaustion as failure
     elif [[ $((capacity_failures + user_limit_failures + rate_limit_failures)) -eq 2 ]]; then
+        # Mixed capacity, limit, and rate limit issues - still expected behavior
         log_info "遇到混合 Oracle 限制 - 将在下次调度时重试"
         log_info "这是 Oracle Cloud 的正常行为 - 容量、限额或速率限制"
         
-        # 通知策略: 混合限制场景不发送通知
-        # 这些是预期的 Oracle 运行状态，通过重试周期自动解决
+        # Notification Policy: NO notifications for mixed constraint scenarios
+        # These are EXPECTED Oracle operational conditions that resolve through retry cycles
+        # Per CLAUDE.md policy: \"DO NOT send notifications for\" expected operational conditions
         
-        return 0
+        return 0  # Mixed constraint issues are still expected behavior
     else
         # Analyze and report the specific failure reasons
         local failure_summary=""
         if [[ $STATUS_A1 -ne 0 && $STATUS_A1 -ne 2 && $STATUS_A1 -ne 5 && $STATUS_A1 -ne 6 ]]; then
-            failure_summary="A1.Flex 失败（退出码: $STATUS_A1）"
+            failure_summary="A1.Flex failed (exit: $STATUS_A1)"
         fi
         if [[ $STATUS_E2 -ne 0 && $STATUS_E2 -ne 2 && $STATUS_E2 -ne 5 && $STATUS_E2 -ne 6 ]]; then
             if [[ -n "$failure_summary" ]]; then
-                failure_summary="$failure_summary, E2.1.Micro 失败（退出码: $STATUS_E2）"
+                failure_summary="$failure_summary, E2.1.Micro failed (exit: $STATUS_E2)"
             else
-                failure_summary="E2.1.Micro 失败（退出码: $STATUS_E2）"
+                failure_summary="E2.1.Micro failed (exit: $STATUS_E2)"
             fi
         fi
         
@@ -900,13 +917,13 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     
     # Log final exit code for debugging (if DEBUG enabled)
     if [[ "${DEBUG:-}" == "true" ]]; then
-        echo "launch-parallel.sh 最终退出码: $main_exit_code"
+        echo "launch-parallel.sh final exit code: $main_exit_code"
         case $main_exit_code in
-            0) echo "成功: 所有操作完成或遇到预期的 Oracle 约束" ;;
-            2) echo "成功: 容量约束（Oracle 正常行为）" ;;
-            5) echo "成功: 用户限额已达（预期免费层行为）" ;;
-            6) echo "成功: 遇到速率限制（预期 Oracle API 行为）" ;;
-            *) echo "失败: 需要关注的真实错误（退出码 $main_exit_code）" ;;
+            0) echo "SUCCESS: All operations completed successfully or expected Oracle constraints" ;;
+            2) echo "SUCCESS: Capacity constraints (normal Oracle behavior)" ;;
+            5) echo "SUCCESS: User limits reached (expected free tier behavior)" ;;
+            6) echo "SUCCESS: Rate limits encountered (expected Oracle API behavior)" ;;
+            *) echo "FAILURE: Genuine error requiring attention (exit $main_exit_code)" ;;
         esac
     fi
     

@@ -1,168 +1,242 @@
-# Oracle 实例创建器 - 配置指南
+# Oracle Instance Creator Configuration Guide
 
-## 概述
+This document provides comprehensive information about configuring and using the Oracle Instance Creator after the refactoring.
 
-Oracle 实例创建器是一个模块化的自动化工具，通过 GitHub Actions 定时调度，持续尝试在 Oracle Cloud 免费层创建计算实例。
+## Overview
 
-## 架构
+The Oracle Instance Creator has been refactored into a modular architecture with separate scripts for different functions, structured configuration files, and enhanced error handling.
 
-### 文件结构
+## Architecture
+
+### File Structure
 ```
 ├── .github/workflows/
-│   └── infrastructure-deployment.yml   # GitHub Actions 工作流
-├── config/
-│   └── templates/                      # 配置模板
+│   └── free-tier-creation.yml     # Simplified GitHub Actions workflow
 ├── scripts/
-│   ├── launch-parallel.sh              # 并行启动编排器
-│   ├── launch-instance.sh              # 单实例创建核心逻辑
-│   ├── utils.sh                        # OCI CLI 封装 + 工具函数
-│   ├── constants.sh                    # 集中化常量定义
-│   ├── circuit-breaker.sh              # 熔断器模式
-│   ├── state-manager.sh                # 实例状态缓存管理
-│   ├── validate-config.sh              # 配置验证
-│   ├── setup-oci.sh                    # OCI CLI 配置
-│   ├── setup-ssh.sh                    # SSH 密钥配置
-│   ├── notify.sh                       # Telegram 通知
-│   ├── preflight-check.sh              # 生产环境预检
-│   ├── adaptive-scheduler.sh           # 自适应调度器
-│   ├── schedule-optimizer.sh           # 调度优化器
-│   ├── metrics.sh                      # 指标收集
-│   └── test-runner.sh                  # 测试运行器
+│   ├── setup-oci.sh               # OCI CLI configuration
+│   ├── setup-ssh.sh               # SSH key configuration
+│   ├── validate-config.sh         # Configuration validation
+│   ├── launch-instance.sh         # Instance creation logic
+│   ├── notify.sh                  # Telegram notifications
+│   └── utils.sh                   # Common utility functions
+├── config/
+│   ├── instance-profiles.yml      # Pre-defined instance configurations
+│   ├── defaults.yml               # Default values and validation rules
+│   └── regions.yml                # Region and availability domain reference
 └── docs/
-    └── configuration.md                # 本文件
+    └── configuration.md           # This file
 ```
 
-### 工作流作业
+### Workflow Jobs
 
-GitHub Actions 工作流包含两个作业：
+The GitHub Actions workflow consists of two focused jobs with secure credential handling:
 
-1. **部署 OCI 基础设施（并行编排）**: 验证配置、设置环境、并行创建 A1.Flex 和 E2.1.Micro 实例
-2. **失败时通知**: 主作业失败时发送 Telegram 通知
+1. **create-instance**: Validates configuration, sets up environment, and creates OCI instance (all in one job for security)
+2. **notify-on-failure**: Sends failure notifications if the main job fails
 
-## 配置
+**Security Note**: All credential operations occur within a single job to avoid storing sensitive data in artifacts between jobs.
 
-### 必需的 GitHub Secrets
+## Configuration
 
-| Secret 名称 | 说明 | 示例 |
-|-------------|------|------|
-| `OCI_USER_OCID` | OCI 用户 OCID | `ocid1.user.oc1..aaaa...` |
-| `OCI_KEY_FINGERPRINT` | API 密钥指纹 | `12:34:56:78:90:ab:cd:ef...` |
-| `OCI_TENANCY_OCID` | OCI 租户 OCID | `ocid1.tenancy.oc1..aaaa...` |
-| `OCI_REGION` | OCI 区域标识符 | `us-sanjose-1` |
-| `OCI_PRIVATE_KEY` | 私有 API 密钥内容 | `-----BEGIN RSA PRIVATE KEY-----...` |
-| `OCI_SUBNET_ID` | 目标子网 OCID | `ocid1.subnet.oc1..aaaa...` |
-| `INSTANCE_SSH_PUBLIC_KEY` | SSH 公钥 | `ssh-rsa AAAA...` |
-| `TELEGRAM_TOKEN` | Telegram 机器人令牌 | `123456:ABC-DEF...` |
-| `TELEGRAM_USER_ID` | Telegram 用户 ID | `123456789` |
+### Required GitHub Secrets
 
-### 可选的 GitHub Secrets
+All secrets must be configured in your GitHub repository settings:
 
-| Secret 名称 | 说明 | 默认值 |
-|-------------|------|--------|
-| `OCI_COMPARTMENT_ID` | 目标区间 OCID | 使用租户 OCID |
-| `OCI_IMAGE_ID` | 指定镜像 OCID | 自动检测 |
-| `OCI_A1_BOOT_VOLUME_ID` | A1 引导卷 OCID | 新建引导卷 |
-| `SKIP_SHAPES` | 跳过的形状（逗号分隔） | `E2` |
-| `OCI_AD` | 可用性域 | 自动检测 |
+| Secret Name | Description | Example |
+|-------------|-------------|---------|
+| `OCI_USER_OCID` | Your OCI user OCID | `ocid1.user.oc1..aaaa...` |
+| `OCI_KEY_FINGERPRINT` | API key fingerprint | `12:34:56:78:90:ab:cd:ef...` |
+| `OCI_TENANCY_OCID` | Your OCI tenancy OCID | `ocid1.tenancy.oc1..aaaa...` |
+| `OCI_REGION` | OCI region identifier | `ap-singapore-1` |
+| `OCI_PRIVATE_KEY` | Private API key content | `-----BEGIN RSA PRIVATE KEY-----...` |
+| `OCI_SUBNET_ID` | Target subnet OCID | `ocid1.subnet.oc1..aaaa...` |
+| `INSTANCE_SSH_PUBLIC_KEY` | SSH public key for access | `ssh-rsa AAAA...` |
+| `TELEGRAM_TOKEN` | Telegram bot token | `123456:ABC-DEF...` |
+| `TELEGRAM_USER_ID` | Telegram user ID | `123456789` |
 
-### 环境变量
+### Optional GitHub Secrets
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `OCI_SHAPE` | 实例形状 | `VM.Standard.A1.Flex` |
-| `OCI_OCPUS` | OCPU 数量（弹性形状） | `4` |
-| `OCI_MEMORY_IN_GBS` | 内存 GB（弹性形状） | `24` |
-| `ASSIGN_PUBLIC_IP` | 分配公网 IP | `true` |
-| `OPERATING_SYSTEM` | 操作系统 | `Oracle Linux` |
-| `OS_VERSION` | 操作系统版本 | `10` |
-| `BOOT_VOLUME_SIZE` | 引导卷大小 GB | `50` |
-| `OCI_REGION_TIMEZONE` | 区域时区 | `America/Los_Angeles` |
+| Secret Name | Description | Default |
+|-------------|-------------|---------|
+| `OCI_COMPARTMENT_ID` | Target compartment OCID | Uses tenancy OCID |
+| `OCI_IMAGE_ID` | Specific image OCID | Auto-discovered |
 
-## 退出码
+### Environment Variables
 
-| 退出码 | 含义 | 工作流处理 |
-|--------|------|-----------|
-| 0 | 成功 | ✅ 成功 |
-| 2 | 容量不足 | ✅ 成功（预期行为） |
-| 5 | 用户限额已达 | ✅ 成功（预期行为） |
-| 6 | 速率限制 | ✅ 成功（预期行为） |
-| 124 | 超时 | ❌ 失败 |
-| 其他 | 真实错误 | ❌ 失败 |
+These can be set in the GitHub Actions workflow file:
 
-## 错误处理
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OCI_AD` | Availability domain | `fgaj:AP-SINGAPORE-1-AD-1` |
+| `OCI_SHAPE` | Instance shape | `VM.Standard.A1.Flex` |
+| `OCI_OCPUS` | Number of OCPUs (flexible shapes) | `4` |
+| `OCI_MEMORY_IN_GBS` | Memory in GB (flexible shapes) | `24` |
+| `INSTANCE_DISPLAY_NAME` | Instance display name | `a1-sg` |
+| `ASSIGN_PUBLIC_IP` | Assign public IP | `true` |
+| `OPERATING_SYSTEM` | Operating system | `Oracle Linux` |
+| `OS_VERSION` | OS version | `10` |
 
-### 错误分类
+## Using Instance Profiles
 
-1. **CAPACITY**: 无可用容量（不视为失败）
-2. **USER_LIMIT_REACHED**: 用户限额已达（不视为失败）
-3. **RATE_LIMIT**: API 速率限制（不视为失败）
-4. **AUTH**: 认证/授权错误
-5. **CONFIG**: 配置错误（无效 OCID、缺少资源）
-6. **NETWORK**: 网络连接问题
-7. **DUPLICATE**: 实例已存在
-8. **INTERNAL_ERROR**: Oracle 内部错误
+Instance profiles allow you to pre-define common configurations in `config/instance-profiles.yml`.
 
-### 重试逻辑
+### Available Profiles
 
-- 网络错误: 指数退避重试
-- 容量错误: 下次调度自动重试
-- 配置/认证错误: 立即失败并发送通知
-- 速率限制: 下次调度自动重试
+- `arm-singapore`: Default ARM instance in Singapore
+- `amd-singapore`: AMD micro instance in Singapore  
+- `arm-singapore-public`: ARM instance with public IP
+- `arm-frankfurt`: ARM instance in Frankfurt
+- `arm-ubuntu`: ARM Ubuntu instance
 
-## 通知
+### Using a Profile
 
-### Telegram 集成
+To use a profile, you would typically modify the workflow or create a script that loads the profile configuration. The profiles are currently for reference and future enhancement.
 
-通知系统仅在以下情况发送消息：
+## Error Handling
 
-- ✅ 实例创建成功
-- ❌ 认证/授权失败
-- ❌ 配置错误
-- ❌ 真实错误（非容量/限额/速率限制）
+The refactored system includes comprehensive error classification:
 
-**不发送通知的情况**（预期行为）：
-- 容量不足
-- 用户限额已达
-- API 速率限制
+### Error Types
 
-## 调度
+1. **CAPACITY**: No capacity available (not treated as failure)
+2. **AUTH**: Authentication/authorization errors
+3. **CONFIG**: Configuration errors (invalid OCIDs, missing resources)
+4. **NETWORK**: Network connectivity issues
+5. **UNKNOWN**: Other unclassified errors
 
-工作流包含 4 层调度：
+### Retry Logic
 
-1. **激进层**: 每 15 分钟一次（离峰时段）
-2. **保守层**: 每小时一次（高峰时段）
-3. **周末层**: 每 20 分钟一次（周末离峰）
-4. **手动触发**: 随时可手动运行
+- Network errors: Retry with exponential backoff
+- Capacity errors: Silent retry on next scheduled run
+- Configuration/Auth errors: Immediate failure with notification
 
-调度模式根据区域自动优化（美西、美东、新加坡、欧洲等）。
+## Notifications
 
-## 故障排除
+### Telegram Integration
 
-### 常见问题
+The notification system sends structured messages for:
 
-1. **OCID 格式无效**
-   - 错误: `OCI_USER_OCID 格式无效`
-   - 解决: 验证 OCID 格式匹配 `ocid1.type.region.realm.id`
+- Instance creation success
+- Configuration errors
+- Authentication failures
+- Network issues
+- Capacity unavailability
+- Workflow status updates
 
-2. **SSH 密钥格式**
-   - 错误: SSH 公钥验证警告
-   - 解决: 确保密钥以 `ssh-rsa`、`ssh-ed25519` 等开头
+### Message Format
 
-3. **容量错误**
-   - 错误: `Out of host capacity`
-   - 解决: 这是预期行为 - 工作流将自动重试
+All notifications include:
+- Timestamp
+- Error/success type with emoji
+- Detailed context information
+- Suggested actions when applicable
 
-4. **Telegram 通知不工作**
-   - 错误: Telegram API 错误
-   - 解决: 验证机器人令牌和用户 ID 是否正确
+## Scripts Usage
 
-### 调试模式
+### Individual Script Usage
 
-设置 `DEBUG=true` 环境变量启用调试日志输出。
+All scripts can be run independently for testing:
 
-## 安全注意事项
+```bash
+# Validate configuration
+./scripts/validate-config.sh
 
-1. **私钥**: 绝不将私钥提交到仓库
-2. **Secrets 管理**: 使用 GitHub Secrets 存储敏感信息
-3. **文件权限**: 脚本自动设置 OCI 配置文件的正确权限
-4. **网络安全**: 考虑对 OCI 资源设置 IP 限制
+# Setup OCI configuration
+./scripts/setup-oci.sh
+
+# Setup SSH configuration  
+./scripts/setup-ssh.sh
+
+# Launch instance
+./scripts/launch-instance.sh
+
+# Test Telegram notifications
+./scripts/notify.sh test
+```
+
+### Environment Variables for Scripts
+
+When running scripts locally, set these environment variables:
+
+```bash
+export OCI_USER_OCID="ocid1.user.oc1..aaaa..."
+export OCI_KEY_FINGERPRINT="12:34:56:78:90:ab:cd:ef..."
+# ... (all other required variables)
+export DEBUG="true"  # For debug output
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Invalid OCID Format**
+   - Error: `Invalid OCI_USER_OCID format`
+   - Solution: Verify OCID format matches pattern `ocid1.type.region.realm.id`
+
+2. **SSH Key Format**
+   - Error: SSH public key validation warnings
+   - Solution: Ensure key starts with `ssh-rsa`, `ssh-ed25519`, etc.
+
+3. **Capacity Errors**
+   - Error: `No capacity available`
+   - Solution: This is expected - the workflow will retry automatically
+
+4. **Telegram Notifications Not Working**
+   - Error: Telegram API errors
+   - Solution: Verify bot token and user ID are correct
+
+### Debug Mode
+
+Enable debug logging by setting workflow input `verbose_output` to `true` or setting `DEBUG=true` environment variable for local testing.
+
+### Log Analysis
+
+Check the following for troubleshooting:
+- GitHub Actions workflow logs
+- Script exit codes
+- Telegram notification status
+- OCI CLI error messages
+
+## Security Considerations
+
+1. **Private Keys**: Never commit private keys to the repository
+2. **Secrets Management**: Use GitHub Secrets for sensitive information
+3. **File Permissions**: Scripts automatically set correct permissions for OCI config files
+4. **Network Security**: Consider IP restrictions on OCI resources
+
+## Migration from Original
+
+### Changes Made
+
+1. **Modular Architecture**: Single monolithic workflow split into focused scripts
+2. **Enhanced Validation**: Comprehensive input validation with clear error messages
+3. **Better Error Handling**: Classified error responses with appropriate actions
+4. **Configuration Management**: Structured configuration files for different scenarios
+5. **Improved Notifications**: Rich Telegram messages with context and emojis
+
+### Backwards Compatibility
+
+- All existing GitHub Secrets are still used
+- Same functionality with improved reliability
+- Enhanced error messages and logging
+- No changes to external dependencies
+
+## Future Enhancements
+
+Possible future improvements:
+
+1. **Profile Selection**: Allow workflow to select instance profiles dynamically
+2. **Multi-Region Support**: Deploy to multiple regions with fallback
+3. **Resource Monitoring**: Track and report on resource usage
+4. **Advanced Retry Logic**: Smart retry strategies based on error patterns
+5. **Configuration Validation API**: REST API for validating configurations
+
+## Support
+
+For issues with the Oracle Instance Creator:
+
+1. Check GitHub Actions workflow logs
+2. Verify all required secrets are configured
+3. Test individual scripts locally if possible
+4. Review Telegram notifications for detailed error information
+5. Consult OCI documentation for service-specific issues

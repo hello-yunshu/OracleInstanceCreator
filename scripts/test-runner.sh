@@ -1,62 +1,71 @@
 #!/bin/bash
 
+# Test runner for Oracle Instance Creator scripts
+# Runs all test suites and provides summary
+
 set -euo pipefail
 
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TESTS_DIR="$PROJECT_ROOT/tests"
 
+# Test statistics
 TOTAL_SUITES=0
 PASSED_SUITES=0
 FAILED_SUITES=0
 
 run_test_suite() {
     local test_file="$1"
+    # shellcheck disable=SC2155  # basename rarely fails
     local suite_name="$(basename "$test_file" .sh)"
     
-    echo -e "${BLUE}运行测试套件: $suite_name${NC}"
+    echo -e "${BLUE}Running test suite: $suite_name${NC}"
     echo "=" "$(printf '=%.0s' {1..50})"
     
     ((TOTAL_SUITES++))
     
     if bash "$test_file"; then
-        echo -e "${GREEN}✓ 测试套件 '$suite_name' 通过${NC}\n"
+        echo -e "${GREEN}✓ Test suite '$suite_name' passed${NC}\n"
         ((PASSED_SUITES++))
         return 0
     else
-        echo -e "${RED}✗ 测试套件 '$suite_name' 失败${NC}\n"
+        echo -e "${RED}✗ Test suite '$suite_name' failed${NC}\n"
         ((FAILED_SUITES++))
         return 1
     fi
 }
 
 main() {
-    echo -e "${YELLOW}Oracle 实例创建器 - 测试运行器${NC}"
+    echo -e "${YELLOW}Oracle Instance Creator - Test Runner${NC}"
     echo -e "${YELLOW}=====================================${NC}\n"
     
+    # Check if tests directory exists
     if [[ ! -d "$TESTS_DIR" ]]; then
-        echo -e "${RED}错误: 测试目录不存在: $TESTS_DIR${NC}"
+        echo -e "${RED}Error: Tests directory not found: $TESTS_DIR${NC}"
         exit 1
     fi
     
+    # Find all test files
     local test_files=()
     while IFS= read -r -d '' file; do
         test_files+=("$file")
     done < <(find "$TESTS_DIR" -name "test_*.sh" -type f -print0)
     
     if [[ ${#test_files[@]} -eq 0 ]]; then
-        echo -e "${YELLOW}未找到测试文件: $TESTS_DIR${NC}"
+        echo -e "${YELLOW}No test files found in $TESTS_DIR${NC}"
         exit 0
     fi
     
-    echo -e "${BLUE}找到 ${#test_files[@]} 个测试套件${NC}\n"
+    echo -e "${BLUE}Found ${#test_files[@]} test suite(s)${NC}\n"
     
+    # Run each test suite
     local overall_success=true
     for test_file in "${test_files[@]}"; do
         if ! run_test_suite "$test_file"; then
@@ -64,32 +73,35 @@ main() {
         fi
     done
     
-    echo -e "${YELLOW}测试结果汇总${NC}"
+    # Print final summary
+    echo -e "${YELLOW}Final Test Summary${NC}"
     echo -e "${YELLOW}=================${NC}"
-    echo -e "测试套件总数: $TOTAL_SUITES"
-    echo -e "${GREEN}通过: $PASSED_SUITES${NC}"
-    echo -e "${RED}失败: $FAILED_SUITES${NC}"
+    echo -e "Total test suites: $TOTAL_SUITES"
+    echo -e "${GREEN}Passed: $PASSED_SUITES${NC}"
+    echo -e "${RED}Failed: $FAILED_SUITES${NC}"
     
     if [[ "$overall_success" == true ]]; then
-        echo -e "\n${GREEN}🎉 所有测试套件通过！${NC}"
+        echo -e "\n${GREEN}🎉 All test suites passed!${NC}"
         exit 0
     else
-        echo -e "\n${RED}💥 部分测试套件失败！${NC}"
+        echo -e "\n${RED}💥 Some test suites failed!${NC}"
         exit 1
     fi
 }
 
+# Show usage if help requested
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    echo "用法: $0 [选项]"
+    echo "Usage: $0 [options]"
     echo
-    echo "选项:"
-    echo "  -h, --help     显示帮助信息"
+    echo "Options:"
+    echo "  -h, --help     Show this help message"
     echo
-    echo "说明:"
-    echo "  运行 tests/ 目录下的所有测试套件。"
-    echo "  测试文件应命名为 test_*.sh 且具有可执行权限。"
+    echo "Description:"
+    echo "  Runs all test suites found in the tests/ directory."
+    echo "  Test files should be named test_*.sh and be executable."
     echo
     exit 0
 fi
 
+# Run main function
 main "$@"

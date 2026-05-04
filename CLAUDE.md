@@ -52,8 +52,8 @@ wait  # 55s timeout protection
 
 ### Shape Configurations
 ```bash
-# A1.Flex (ARM) - 4 OCPUs, 24GB, instance name: a1-flex-{region_suffix}
-# E2.1.Micro (AMD) - 1 OCPU, 1GB, instance name: e2-micro-{region_suffix}
+# A1.Flex (ARM) - 4 OCPUs, 24GB, instance name: a1-flex-sg
+# E2.1.Micro (AMD) - 1 OCPU, 1GB, instance name: e2-micro-sg
 ```
 
 ## Development Commands
