@@ -146,7 +146,7 @@ count_actual_instances() {
     if a1_instance_id=$(oci_cmd compute instance list \
         --compartment-id "$comp_id" \
         --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-        --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
+        --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
         --query 'data[0].id' \
         --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
         ((actual_count++))
@@ -162,7 +162,7 @@ count_actual_instances() {
     if e2_instance_id=$(oci_cmd compute instance list \
         --compartment-id "$comp_id" \
         --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-        --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
+        --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
         --query 'data[0].id' \
         --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
         ((actual_count++))
@@ -248,7 +248,7 @@ verify_and_update_state() {
         if a1_instance_id=$(oci_cmd compute instance list \
             --compartment-id "$comp_id" \
             --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-            --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
+            --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
             --query 'data[0].id' \
             --raw-output); then
             
@@ -275,7 +275,7 @@ verify_and_update_state() {
         if e2_instance_id=$(oci_cmd compute instance list \
             --compartment-id "$comp_id" \
             --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-            --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
+            --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
             --query 'data[0].id' \
             --raw-output); then
             
@@ -744,9 +744,9 @@ main() {
             if [[ -n "$comp_id" ]] && a1_instance_id=$(oci_cmd compute instance list \
                 --compartment-id "$comp_id" \
                 --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-                --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
+                --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
                 --query 'data[0].id' \
-                --raw-output 2>/dev/null) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
+                --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
                 shapes_created="A1.Flex (ARM)"
                 if a1_details=$(get_instance_details "$a1_instance_id" "A1.Flex (ARM)" 2>/dev/null); then
                     notification_details="$a1_details"
@@ -758,9 +758,9 @@ main() {
             if [[ -n "$comp_id" ]] && e2_instance_id=$(oci_cmd compute instance list \
                 --compartment-id "$comp_id" \
                 --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-                --lifecycle-state "RUNNING,PROVISIONING,STARTING" \
+                --lifecycle-state RUNNING --lifecycle-state PROVISIONING --lifecycle-state STARTING \
                 --query 'data[0].id' \
-                --raw-output 2>/dev/null) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
+                --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
                 shapes_created="${shapes_created:+$shapes_created, }E2.1.Micro (AMD)"
                 if e2_details=$(get_instance_details "$e2_instance_id" "E2.1.Micro (AMD)" 2>/dev/null); then
                     notification_details="${notification_details:+$notification_details

@@ -763,17 +763,17 @@ verify_instance_creation() {
         instance_id=$(oci_cmd compute instance list \
             --compartment-id "$comp_id" \
             --display-name "$INSTANCE_DISPLAY_NAME" \
-            --lifecycle-state "RUNNING,PROVISIONING" \
+            --lifecycle-state RUNNING --lifecycle-state PROVISIONING \
             --limit 1 \
             --query 'data[0].id' \
-            --raw-output 2>/dev/null || echo "")
+            --raw-output || echo "")
         
         if [[ -n "$instance_id" && "$instance_id" != "null" ]]; then
             local state
             state=$(oci_cmd compute instance get \
                 --instance-id "$instance_id" \
                 --query 'data."lifecycle-state"' \
-                --raw-output 2>/dev/null || echo "")
+                --raw-output || echo "")
             
             log_success "找到实例: $instance_id（状态: $state）"
             
