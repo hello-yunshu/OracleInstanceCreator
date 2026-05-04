@@ -245,12 +245,11 @@ verify_and_update_state() {
     
     # Verify A1.Flex instance state if creation was attempted
     if [[ "$status_a1" -eq 0 ]]; then
-        # Instance creation succeeded according to script, verify with OCI API
         local a1_instance_id
         if a1_instance_id=$(oci_cmd compute instance list \
             --compartment-id "$comp_id" \
             --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-            "${ACTIVE_LIFECYCLE_STATES[@]}" \
+            --limit 1 \
             --query 'data[0].id' \
             --raw-output); then
             
@@ -272,12 +271,11 @@ verify_and_update_state() {
     
     # Verify E2.Micro instance state if creation was attempted
     if [[ "$status_e2" -eq 0 ]]; then
-        # Instance creation succeeded according to script, verify with OCI API
         local e2_instance_id
         if e2_instance_id=$(oci_cmd compute instance list \
             --compartment-id "$comp_id" \
             --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-            "${ACTIVE_LIFECYCLE_STATES[@]}" \
+            --limit 1 \
             --query 'data[0].id' \
             --raw-output); then
             
@@ -746,7 +744,7 @@ main() {
             if [[ -n "$comp_id" ]] && a1_instance_id=$(oci_cmd compute instance list \
                 --compartment-id "$comp_id" \
                 --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
-                "${ACTIVE_LIFECYCLE_STATES[@]}" \
+                --limit 1 \
                 --query 'data[0].id' \
                 --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
                 shapes_created="A1.Flex (ARM)"
@@ -760,7 +758,7 @@ main() {
             if [[ -n "$comp_id" ]] && e2_instance_id=$(oci_cmd compute instance list \
                 --compartment-id "$comp_id" \
                 --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-                "${ACTIVE_LIFECYCLE_STATES[@]}" \
+                --limit 1 \
                 --query 'data[0].id' \
                 --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
                 shapes_created="${shapes_created:+$shapes_created, }E2.1.Micro (AMD)"
