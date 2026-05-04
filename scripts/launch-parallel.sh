@@ -59,11 +59,11 @@ track_resource_usage() {
 terminate_processes() {
     # Graceful termination first
     if [[ -n "$PID_A1" ]] && kill -0 "$PID_A1" 2>/dev/null; then
-        log_debug "Terminating A1 process (PID: $PID_A1)"
+        log_debug "正在终止 A1 进程 (PID: $PID_A1)"
         kill "$PID_A1" 2>/dev/null || true
     fi
     if [[ -n "$PID_E2" ]] && kill -0 "$PID_E2" 2>/dev/null; then
-        log_debug "Terminating E2 process (PID: $PID_E2)"
+        log_debug "正在终止 E2 进程 (PID: $PID_E2)"
         kill "$PID_E2" 2>/dev/null || true
     fi
     sleep "$GRACEFUL_TERMINATION_DELAY" # 2-second grace period allows processes to cleanup before SIGKILL
@@ -79,7 +79,7 @@ terminate_processes() {
 
 # Signal handler for graceful shutdown
 cleanup_handler() {
-    log_warning "Received interrupt signal - cleaning up background processes"
+    log_warning "收到中断信号 - 正在清理后台进程"
 
     terminate_processes
 
@@ -88,7 +88,7 @@ cleanup_handler() {
         rm -rf "$temp_dir" 2>/dev/null || true
     fi
 
-    log_info "Cleanup completed"
+    log_info "清理完成"
     exit "$OCI_EXIT_GENERAL_ERROR"
 }
 
@@ -118,7 +118,7 @@ declare -A E2_MICRO_CONFIG=(
 count_actual_instances() {
     local comp_id
     comp_id=$(require_env_var "OCI_COMPARTMENT_ID" 2>/dev/null) || {
-        log_debug "OCI_COMPARTMENT_ID unavailable - cannot verify instance count"
+        log_debug "OCI_COMPARTMENT_ID 不可用 - 无法验证实例数量"
         return 0
     }
     
@@ -163,7 +163,7 @@ launch_shape() {
     local shape_name="$1"
     local -n config=$2
 
-    log_info "Starting $shape_name launch attempt..."
+    log_info "正在启动 $shape_name 创建尝试..."
 
     # Track shape-specific timing
     local shape_start_time
@@ -176,7 +176,7 @@ launch_shape() {
     export INSTANCE_DISPLAY_NAME="${config[DISPLAY_NAME]}"
     if [[ -n "${config[BOOT_VOLUME_ID]:-}" ]]; then
         export BOOT_VOLUME_ID="${config[BOOT_VOLUME_ID]}"
-        log_info "Using existing boot volume for $shape_name: ${config[BOOT_VOLUME_ID]}"
+        log_info "使用已有引导卷 $shape_name: ${config[BOOT_VOLUME_ID]}"
     else
         unset BOOT_VOLUME_ID
     fi
@@ -212,14 +212,14 @@ verify_and_update_state() {
     
     # Initialize state manager if not already done
     if ! init_state_manager "$state_file" >/dev/null; then
-        log_error "Failed to initialize state manager"
+        log_error "状态管理器初始化失败"
         return 1
     fi
     
     # Get the compartment ID for OCI API calls
     local comp_id
     if ! comp_id=$(require_env_var "OCI_COMPARTMENT_ID" 2>/dev/null); then
-        log_error "OCI_COMPARTMENT_ID not available - cannot verify instance state"
+        log_error "OCI_COMPARTMENT_ID 不可用 - 无法验证实例状态"
         return 2  # Return specific error code for missing config
     fi
     
@@ -235,17 +235,17 @@ verify_and_update_state() {
             --raw-output 2>/dev/null); then
             
             if [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
-                log_info "Verified A1.Flex instance exists: $a1_instance_id"
+                log_info "已验证 A1.Flex 实例存在: $a1_instance_id"
                 if ! record_instance_verification "${A1_FLEX_CONFIG[DISPLAY_NAME]}" "$a1_instance_id" "verified" "$state_file"; then
-                    log_warning "Failed to record A1.Flex instance verification"
+                    log_warning "记录 A1.Flex 实例验证失败"
                     ((verification_errors++))
                 fi
             else
-                log_warning "A1.Flex instance creation reported success but instance not found via API"
+                log_warning "A1.Flex 实例创建报告成功但 API 未找到实例"
                 ((verification_errors++))
             fi
         else
-            log_error "Failed to query A1.Flex instance state via OCI API"
+            log_error "通过 OCI API 查询 A1.Flex 实例状态失败"
             ((verification_errors++))
         fi
     fi
@@ -262,17 +262,17 @@ verify_and_update_state() {
             --raw-output 2>/dev/null); then
             
             if [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
-                log_info "Verified E2.Micro instance exists: $e2_instance_id"
+                log_info "已验证 E2.Micro 实例存在: $e2_instance_id"
                 if ! record_instance_verification "${E2_MICRO_CONFIG[DISPLAY_NAME]}" "$e2_instance_id" "verified" "$state_file"; then
-                    log_warning "Failed to record E2.Micro instance verification"
+                    log_warning "记录 E2.Micro 实例验证失败"
                     ((verification_errors++))
                 fi
             else
-                log_warning "E2.Micro instance creation reported success but instance not found via API"
+                log_warning "E2.Micro 实例创建报告成功但 API 未找到实例"
                 ((verification_errors++))
             fi
         else
-            log_error "Failed to query E2.Micro instance state via OCI API"
+            log_error "通过 OCI API 查询 E2.Micro 实例状态失败"
             ((verification_errors++))
         fi
     fi
@@ -285,7 +285,7 @@ verify_and_update_state() {
     
     # Return appropriate exit code based on verification results
     if [[ "$verification_errors" -gt 0 ]]; then
-        log_warning "Instance state verification completed with $verification_errors error(s)"
+        log_warning "实例状态验证完成，有 $verification_errors 个错误"
         return 3  # Return specific code for verification errors (non-critical)
     else
         log_debug "Instance state verification completed successfully"
@@ -342,7 +342,7 @@ get_instance_details() {
 # Main parallel execution
 main() {
     start_timer "parallel_execution"
-    log_info "Starting parallel OCI instance creation for both free tier shapes"
+    log_info "开始并行创建两种免费层形状的 OCI 实例"
 
     # Set timeout to prevent exceeding 60 seconds (GitHub Actions billing boundary)
     # Using constant defined in constants.sh for consistency and maintainability
@@ -371,30 +371,30 @@ main() {
     
     # Initialize state manager to ensure state file exists
     if ! init_state_manager "$state_file" >/dev/null; then
-        log_warning "Failed to initialize state manager, proceeding with all shapes"
+        log_warning "状态管理器初始化失败，继续尝试所有形状"
     else
         # Check A1.Flex limit state
         if get_cached_limit_state "${A1_FLEX_CONFIG[SHAPE]}" "$state_file"; then
             should_launch_a1=false
-            log_info "A1.Flex: Cached limit reached - skipping creation attempt"
+            log_info "A1.Flex: 缓存限额已达 - 跳过创建尝试"
             echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$a1_result"
         else
-            log_debug "A1.Flex: No cached limit - proceeding with creation attempt"
+            log_debug "A1.Flex: 无缓存限额 - 继续创建尝试"
         fi
         
         # Check E2.Micro limit state  
         if get_cached_limit_state "${E2_MICRO_CONFIG[SHAPE]}" "$state_file"; then
             should_launch_e2=false
-            log_info "E2.1.Micro: Cached limit reached - skipping creation attempt"
+            log_info "E2.1.Micro: 缓存限额已达 - 跳过创建尝试"
             echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$e2_result"
         else
-            log_debug "E2.1.Micro: No cached limit - proceeding with creation attempt"
+            log_debug "E2.1.Micro: 无缓存限额 - 继续创建尝试"
         fi
         
         # Early exit if both shapes are at cached limits
         if [[ "$should_launch_a1" == false && "$should_launch_e2" == false ]]; then
-            log_info "Both shapes at cached limits - no creation attempts needed"
-            log_info "Consider managing existing instances to free capacity or wait for limit cache to expire"
+            log_info "两种形状均达缓存限额 - 无需创建尝试"
+            log_info "请考虑管理现有实例以释放容量，或等待限额缓存过期"
             # Clean up temporary files
             rm -rf "$temp_dir" 2>/dev/null || true
             return 0  # Success - no work needed due to limits
@@ -403,7 +403,7 @@ main() {
 
     # Launch A1.Flex in background (if not skipped due to cached limits)
     if [[ "$should_launch_a1" == true ]]; then
-        log_info "Launching A1.Flex (ARM) instance in background..."
+        log_info "正在后台启动 A1.Flex (ARM) 实例..."
         (
             # Capture both exit code and any error output
             set -o pipefail
@@ -432,7 +432,7 @@ main() {
 
     # Launch E2.Micro in background (if not skipped due to cached limits)
     if [[ "$should_launch_e2" == true ]]; then
-        log_info "Launching E2.1.Micro (AMD) instance in background..."
+        log_info "正在后台启动 E2.1.Micro (AMD) 实例..."
         (
             # Capture both exit code and any error output
             set -o pipefail
@@ -463,7 +463,7 @@ main() {
     log_performance_metric "CONCURRENT_START" "parallel_execution" "1" "2" "A1_PID=$PID_A1,E2_PID=$PID_E2"
 
     # Wait for both processes to complete with timeout
-    log_info "Waiting for both shape attempts to complete (timeout: ${timeout_seconds}s)..."
+    log_info "等待两种形状尝试完成（超时: ${timeout_seconds}s）..."
 
     # Initialize status variables
     local STATUS_A1=1
@@ -525,11 +525,11 @@ main() {
         log_debug "A1 result file found with status: $STATUS_A1"
         # Validate the status is numeric
         if [[ ! "$STATUS_A1" =~ ^[0-9]+$ ]]; then
-            log_warning "A1 result file contains invalid status '$STATUS_A1', using failure status"
+            log_warning "A1 结果文件包含无效状态 '$STATUS_A1'，使用失败状态"
             STATUS_A1=1
         fi
     else
-        log_warning "A1 result file not found - using wait result or default failure status"
+        log_warning "A1 结果文件未找到 - 使用等待结果或默认失败状态"
         STATUS_A1=${a1_wait_result:-1}
     fi
 
@@ -538,16 +538,16 @@ main() {
         log_debug "E2 result file found with status: $STATUS_E2"
         # Validate the status is numeric
         if [[ ! "$STATUS_E2" =~ ^[0-9]+$ ]]; then
-            log_warning "E2 result file contains invalid status '$STATUS_E2', using failure status"
+            log_warning "E2 结果文件包含无效状态 '$STATUS_E2'，使用失败状态"
             STATUS_E2=1
         fi
     else
-        log_warning "E2 result file not found - using wait result or default failure status"
+        log_warning "E2 结果文件未找到 - 使用等待结果或默认失败状态"
         STATUS_E2=${e2_wait_result:-1}
     fi
     # Handle timeout case - architecture-aware approach respecting smart shape filtering
     if [[ $elapsed -ge $timeout_seconds ]]; then
-        log_warning "Execution timeout reached (${timeout_seconds}s) - terminating background processes"
+        log_warning "执行超时（${timeout_seconds}s）- 正在终止后台进程"
         terminate_processes
         
         # Only apply timeout errors to shapes that were actually launched and have generic error codes
@@ -586,24 +586,24 @@ main() {
         # Verification is to check if successful instances actually exist in OCI
         if [[ $STATUS_A1 -eq 0 || $STATUS_E2 -eq 0 ]]; then
             should_verify=true
-            log_debug "Verification needed - at least one instance reported success"
+            log_debug "需要验证 - 至少一个实例报告成功"
         fi
         
         # Also verify if execution took a reasonable amount of time (not instant cache hit)
         # This handles edge cases where rapid failures might indicate cache issues
         if [[ $elapsed -gt 2 && ($STATUS_A1 -ne 0 || $STATUS_E2 -ne 0) ]]; then
             should_verify=true  
-            log_debug "Verification needed - non-instant execution with failures"
+            log_debug "需要验证 - 非瞬时执行且有失败"
         fi
         
         if [[ "$should_verify" == "true" ]]; then
-            log_info "Verifying instance states and updating cache..."
+            log_info "正在验证实例状态并更新缓存..."
             # Capture but don't propagate verification errors - they're non-critical
             if ! verify_and_update_state "$STATUS_A1" "$STATUS_E2"; then
-                log_warning "Instance state verification encountered issues but continuing"
+                log_warning "实例状态验证遇到问题但继续执行"
             fi
         else
-            log_debug "Skipping verification - no successful instances to verify"
+            log_debug "跳过验证 - 无成功实例需要验证"
         fi
     fi
     # Collect shape-specific durations for analysis (before cleanup)
@@ -625,19 +625,19 @@ main() {
 
     # Log results
     if [[ $STATUS_A1 -eq 0 ]]; then
-        log_success "A1.Flex (ARM) instance creation: SUCCESS"
+        log_success "A1.Flex (ARM) 实例创建: 成功"
     elif [[ $STATUS_A1 -eq 124 ]]; then
-        log_warning "A1.Flex (ARM) instance creation: TIMEOUT"
+        log_warning "A1.Flex (ARM) 实例创建: 超时"
     else
-        log_warning "A1.Flex (ARM) instance creation: FAILED"
+        log_warning "A1.Flex (ARM) 实例创建: 失败"
     fi
 
     if [[ $STATUS_E2 -eq 0 ]]; then
-        log_success "E2.1.Micro (AMD) instance creation: SUCCESS"
+        log_success "E2.1.Micro (AMD) 实例创建: 成功"
     elif [[ $STATUS_E2 -eq 124 ]]; then
-        log_warning "E2.1.Micro (AMD) instance creation: TIMEOUT"
+        log_warning "E2.1.Micro (AMD) 实例创建: 超时"
     else
-        log_warning "E2.1.Micro (AMD) instance creation: FAILED"
+        log_warning "E2.1.Micro (AMD) 实例创建: 失败"
     fi
 
     # Determine overall result
@@ -690,7 +690,7 @@ main() {
     actual_instances=$(count_actual_instances)
     
     if [[ $actual_instances -gt 0 ]]; then
-        log_success "Parallel execution completed: $actual_instances of 2 instances actually exist and running"
+        log_success "并行执行完成: $actual_instances/2 个实例实际存在且运行中"
 
         # Instance hunting success: notify for ANY created instances with details
         if [[ "${ENABLE_NOTIFICATIONS:-}" == "true" ]]; then
@@ -743,8 +743,8 @@ $notification_details"
         return 0
     elif [[ $user_limit_failures -gt 0 && $((user_limit_failures + success_count)) -eq 2 ]]; then
         # User limits reached - this is expected behavior when at free tier limits
-        log_info "User limit(s) reached for $user_limit_failures shape(s) - no further attempts needed"
-        log_info "Consider managing existing instances to free capacity for new deployments"
+        log_info "$user_limit_failures 种形状已达用户限额 - 无需继续尝试"
+        log_info "请考虑管理现有实例以释放新部署的容量"
         
         # Notification Policy: NO notifications for user limits
         # User limits are EXPECTED free tier behavior - normal operation
@@ -753,8 +753,8 @@ $notification_details"
         return 0  # User limits are not failures - they're expected behavior
     elif [[ $rate_limit_failures -gt 0 && $((rate_limit_failures + success_count + capacity_failures + user_limit_failures)) -eq 2 ]]; then
         # Rate limits encountered - this is expected Oracle behavior, no notifications needed
-        log_info "Oracle API rate limits encountered for $rate_limit_failures shape(s) - will retry on next scheduled run"
-        log_info "This is normal Oracle API behavior during high usage periods and resolves automatically"
+        log_info "$rate_limit_failures 种形状遇到 Oracle API 速率限制 - 将在下次调度运行时重试"
+        log_info "这是 Oracle API 在高使用期间的正常行为，会自动恢复"
         
         # Notification Policy: NO notifications for rate limits  
         # Rate limiting is EXPECTED Oracle API behavior during high usage periods
@@ -763,8 +763,8 @@ $notification_details"
         return 0  # Rate limits are not failures - they're expected behavior
     elif [[ $capacity_failures -eq 2 ]]; then
         # Both failed due to Oracle capacity constraints - this is expected behavior
-        log_info "Both shapes unavailable due to Oracle capacity constraints - will retry on next schedule"
-        log_info "This is normal behavior when Oracle Cloud capacity is temporarily exhausted"
+        log_info "两种形状因 Oracle 容量限制不可用 - 将在下次调度时重试"
+        log_info "这是 Oracle Cloud 容量暂时耗尽时的正常行为"
 
         # Notification Policy: NO notifications for Oracle capacity constraints
         # Capacity constraints are EXPECTED operational conditions that resolve through retry cycles
@@ -773,8 +773,8 @@ $notification_details"
         return 0 # Don't treat capacity exhaustion as failure
     elif [[ $((capacity_failures + user_limit_failures + rate_limit_failures)) -eq 2 ]]; then
         # Mixed capacity, limit, and rate limit issues - still expected behavior
-        log_info "Mixed Oracle constraints encountered - will retry on next schedule"
-        log_info "This is normal Oracle Cloud behavior - capacity, limits, or rate limiting"
+        log_info "遇到混合 Oracle 限制 - 将在下次调度时重试"
+        log_info "这是 Oracle Cloud 的正常行为 - 容量、限额或速率限制"
         
         # Notification Policy: NO notifications for mixed constraint scenarios
         # These are EXPECTED Oracle operational conditions that resolve through retry cycles
@@ -796,9 +796,9 @@ $notification_details"
         fi
         
         if [[ -n "$failure_summary" ]]; then
-            log_error "Parallel execution failed: $failure_summary - likely configuration or authentication errors"
+            log_error "并行执行失败: $failure_summary - 可能是配置或认证错误"
         else
-            log_error "Parallel execution failed: Both instance creation attempts failed"
+            log_error "并行执行失败: 两种实例创建尝试均失败"
         fi
 
         # Let individual shape failures handle their own error notifications

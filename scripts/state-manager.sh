@@ -5,8 +5,17 @@
 
 set -euo pipefail
 
-# Source common utilities (which includes constants.sh)
 source "$(dirname "${BASH_SOURCE[0]:-$0}")/utils.sh"
+
+format_timestamp() {
+    local timestamp="$1"
+    local format="${2:-'+%Y-%m-%d %H:%M:%S UTC'}"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        date -r "$timestamp" "$format" 2>/dev/null || echo "$timestamp"
+    else
+        date -d "@$timestamp" "$format" 2>/dev/null || echo "$timestamp"
+    fi
+}
 
 # =============================================================================
 # CACHE CONFIGURATION (constants defined in constants.sh)
@@ -97,23 +106,23 @@ acquire_state_lock() {
     # Try to acquire lock with timeout
     while (( wait_count < timeout )); do
         if (set -C; echo $$ > "$lock_file") 2>/dev/null; then
-            log_debug "Acquired state lock: $lock_file"
+            log_debug "已获取状态锁: $lock_file"
             return 0
         fi
         
         # Check if lock is stale (older than 5 minutes)
         if [[ -f "$lock_file" ]] && [[ $(( $(date +%s) - $(stat -c %Y "$lock_file" 2>/dev/null || stat -f %m "$lock_file" 2>/dev/null || echo 0) )) -gt 300 ]]; then
-            log_warning "Removing stale lock file: $lock_file"
+            log_warning "正在移除过期锁文件: $lock_file"
             rm -f "$lock_file"
             continue
         fi
         
-        log_debug "Waiting for state lock... ($((wait_count + 1))/$timeout)"
+        log_debug "等待状态锁... ($((wait_count + 1))/$timeout)"
         sleep 1
         ((wait_count++))
     done
     
-    log_error "Failed to acquire state lock after ${timeout}s: $lock_file"
+    log_error "在 ${timeout}s 后获取状态锁失败: $lock_file"
     return 1
 }
 
@@ -123,7 +132,7 @@ release_state_lock() {
     
     if [[ -f "$lock_file" ]]; then
         rm -f "$lock_file"
-        log_debug "Released state lock: $lock_file"
+        log_debug "已释放状态锁: $lock_file"
     fi
 }
 
@@ -144,7 +153,7 @@ with_state_lock() {
         trap - EXIT ERR
         return $result
     else
-        log_error "Failed to acquire lock for state operation: $func_name"
+        log_error "状态操作获取锁失败: $func_name"
         return 1
     fi
 }
@@ -210,7 +219,7 @@ init_state_file() {
     state_dir=$(dirname "$state_file")
     if [[ ! -d "$state_dir" ]]; then
         mkdir -p "$state_dir"
-        log_debug "Created state directory: $state_dir"
+        log_debug "已创建状态目录: $state_dir"
     fi
     
     local timestamp
@@ -232,7 +241,7 @@ init_state_file() {
 }
 EOF
     
-    log_debug "Initialized empty state file: $state_file"
+    log_debug "已初始化空状态文件: $state_file"
 }
 
 # Load state from file with validation
@@ -241,25 +250,25 @@ load_state() {
     state_file=$(get_state_file_path "${1:-}")
     
     if [[ ! -f "$state_file" ]]; then
-        log_debug "State file not found, initializing: $state_file"
+        log_debug "状态文件未找到，正在初始化: $state_file"
         init_state_file "$state_file"
     fi
     
     # Validate JSON structure
     if ! jq empty "$state_file" 2>/dev/null; then
-        log_warning "Invalid JSON in state file, reinitializing: $state_file"
+        log_warning "状态文件中 JSON 无效，正在重新初始化: $state_file"
         init_state_file "$state_file"
     fi
     
     # Ensure required fields exist
     if ! jq -e '.instances' "$state_file" >/dev/null 2>&1; then
-        log_warning "State file missing instances field, reinitializing: $state_file"
+        log_warning "状态文件缺少 instances 字段，正在重新初始化: $state_file"
         init_state_file "$state_file"
     fi
     
     # Ensure limits field exists (for backward compatibility with existing state files)
     if ! jq -e '.limits' "$state_file" >/dev/null 2>&1; then
-        log_info "State file missing limits field, adding default limit structure"
+        log_info "状态文件缺少 limits 字段，添加默认限额结构"
         local timestamp
         timestamp=$(date +%s)
         local temp_file
@@ -347,7 +356,7 @@ _update_instance_state_locked() {
     
     mv "$temp_file" "$state_file"
     
-    log_info "Updated instance state: $instance_name (OCID: $ocid, Status: $status)"
+    log_info "已更新实例状态: $instance_name (OCID: $ocid, 状态: $status)"
 }
 
 # Add or update instance in state with file locking
@@ -367,7 +376,7 @@ _remove_instance_state_locked() {
     local instance_name="$2"
     
     if [[ ! -f "$state_file" ]]; then
-        log_debug "State file not found, nothing to remove: $state_file"
+        log_debug "状态文件未找到，无内容可移除: $state_file"
         return 0
     fi
     
@@ -383,7 +392,7 @@ _remove_instance_state_locked() {
     
     mv "$temp_file" "$state_file"
     
-    log_info "Removed instance from state: $instance_name"
+    log_info "已从状态中移除实例: $instance_name"
 }
 
 # Remove instance from state with file locking
@@ -426,7 +435,7 @@ is_state_expired() {
         updated_epoch="$updated_timestamp"
     else
         # Fallback: assume expired if not a valid Unix timestamp
-        log_debug "Invalid Unix timestamp format: $updated_timestamp"
+        log_debug "无效的 Unix 时间戳格式: $updated_timestamp"
         return 0  # Treat as expired
     fi
     
@@ -434,10 +443,10 @@ is_state_expired() {
     expiry_epoch=$((updated_epoch + ttl_seconds))
     
     if [[ "$current_epoch" -gt "$expiry_epoch" ]]; then
-        log_debug "State cache expired (TTL: ${ttl_hours}h, Updated: $updated_timestamp)"
+        log_debug "状态缓存已过期 (TTL: ${ttl_hours}h, 更新时间: $updated_timestamp)"
         return 0  # Expired
     else
-        log_debug "State cache valid (TTL: ${ttl_hours}h, Updated: $updated_timestamp)"
+        log_debug "状态缓存有效 (TTL: ${ttl_hours}h, 更新时间: $updated_timestamp)"
         return 1  # Not expired
     fi
 }
@@ -448,13 +457,13 @@ validate_state_file() {
     state_file=$(get_state_file_path "${1:-}")
     
     if [[ ! -f "$state_file" ]]; then
-        log_debug "State file not found: $state_file"
+        log_debug "状态文件未找到: $state_file"
         return 1
     fi
     
     # Check JSON validity
     if ! jq empty "$state_file" 2>/dev/null; then
-        log_warning "Invalid JSON in state file: $state_file"
+        log_warning "状态文件中 JSON 无效: $state_file"
         return 1
     fi
     
@@ -462,7 +471,7 @@ validate_state_file() {
     local required_fields=("version" "instances")
     for field in "${required_fields[@]}"; do
         if ! jq -e ".$field" "$state_file" >/dev/null 2>&1; then
-            log_warning "Missing required field '$field' in state file: $state_file"
+            log_warning "状态文件中缺少必需字段 '$field': $state_file"
             return 1
         fi
     done
@@ -471,11 +480,11 @@ validate_state_file() {
     local state_version
     state_version=$(jq -r '.version // ""' "$state_file")
     if [[ "$state_version" != "$CACHE_VERSION" ]]; then
-        log_warning "State file version mismatch (expected: $CACHE_VERSION, got: $state_version)"
+        log_warning "状态文件版本不匹配（期望: $CACHE_VERSION，实际: $state_version）"
         return 1
     fi
     
-    log_debug "State file validation passed: $state_file"
+    log_debug "状态文件验证通过: $state_file"
     return 0
 }
 
@@ -494,24 +503,24 @@ save_state_to_cache() {
     state_file=$(get_state_file_path "${1:-}")
     
     if [[ "$(get_cache_enabled)" != "true" ]]; then
-        log_debug "Cache disabled, skipping save"
+        log_debug "缓存已禁用，跳过保存"
         return 0
     fi
     
     if ! is_github_actions; then
-        log_debug "Not in GitHub Actions, skipping cache save"
+        log_debug "不在 GitHub Actions 中，跳过缓存保存"
         return 0
     fi
     
     if [[ ! -f "$state_file" ]]; then
-        log_warning "State file not found, cannot save to cache: $state_file"
+        log_warning "状态文件未找到，无法保存到缓存: $state_file"
         return 1
     fi
     
     local cache_key
     cache_key=$(generate_cache_key)
     
-    log_info "Saving state to GitHub Actions cache: $cache_key"
+    log_info "正在保存状态到 GitHub Actions 缓存: $cache_key"
     
     # Ensure the cache directory exists and copy state file
     local cache_dir
@@ -522,7 +531,7 @@ save_state_to_cache() {
     local cached_state="$cache_dir/$STATE_FILE_NAME"
     if [[ "$state_file" != "$cached_state" ]]; then
         cp "$state_file" "$cached_state"
-        log_debug "Copied state file to cache directory: $cached_state"
+        log_debug "已复制状态文件到缓存目录: $cached_state"
     fi
     
     # Note: Actual cache save would be handled by GitHub Actions workflow
@@ -530,7 +539,7 @@ save_state_to_cache() {
     echo "CACHE_KEY=$cache_key" >> "${GITHUB_ENV:-/dev/null}"
     echo "CACHE_PATH=$cache_dir" >> "${GITHUB_ENV:-/dev/null}"
     
-    log_debug "State prepared for caching in: $cache_dir"
+    log_debug "状态已准备好缓存到: $cache_dir"
 }
 
 # Load state from GitHub Actions cache (if available)
@@ -539,12 +548,12 @@ load_state_from_cache() {
     state_file=$(get_state_file_path "${1:-}")
     
     if [[ "$(get_cache_enabled)" != "true" ]]; then
-        log_debug "Cache disabled, skipping load"
+        log_debug "缓存已禁用，跳过加载"
         return 1
     fi
     
     if ! is_github_actions; then
-        log_debug "Not in GitHub Actions, skipping cache load"
+        log_debug "不在 GitHub Actions 中，跳过缓存加载"
         return 1
     fi
     
@@ -564,17 +573,17 @@ load_state_from_cache() {
             # If state file is the same as cached state, no need to copy
             if [[ "$state_file" != "$cached_state" ]]; then
                 cp "$cached_state" "$state_file"
-                log_debug "Copied cached state to: $state_file"
+                log_debug "已复制缓存状态到: $state_file"
             fi
             
-            log_info "Loaded state from GitHub Actions cache"
+            log_info "已从 GitHub Actions 缓存加载状态"
             return 0
         else
-            log_warning "Cached state file invalid, ignoring cache"
+            log_warning "缓存状态文件无效，忽略缓存"
             return 1
         fi
     else
-        log_debug "No cached state found in: $cache_dir"
+        log_debug "在 $cache_dir 中未找到缓存状态"
         return 1
     fi
 }
@@ -588,7 +597,7 @@ init_state_manager() {
     local state_file
     state_file=$(get_state_file_path "${1:-}")
     
-    log_debug "Initializing state manager (cache enabled: $(get_cache_enabled), TTL: $(get_dynamic_ttl_hours)h)"
+    log_debug "正在初始化状态管理器（缓存启用: $(get_cache_enabled), TTL: $(get_dynamic_ttl_hours)h）"
     
     # Try to load from cache first
     if ! load_state_from_cache "$state_file"; then
@@ -605,29 +614,29 @@ should_create_instance() {
     local state_file
     state_file=$(get_state_file_path "${2:-}")
     
-    log_debug "=== SHOULD_CREATE_INSTANCE DEBUG START ==="
-    log_debug "Instance name: $instance_name"
-    log_debug "State file: $state_file"
-    log_debug "Cache enabled: $(get_cache_enabled)"
+    log_debug "=== SHOULD_CREATE_INSTANCE 调试开始 ==="
+    log_debug "实例名称: $instance_name"
+    log_debug "状态文件: $state_file"
+    log_debug "缓存启用: $(get_cache_enabled)"
     
     # If cache disabled, always create
     if [[ "$(get_cache_enabled)" != "true" ]]; then
-        log_debug "Cache disabled, allowing instance creation: $instance_name"
-        log_debug "=== SHOULD_CREATE_INSTANCE DEBUG END: ALLOW (cache disabled) ==="
+        log_debug "缓存已禁用，允许创建实例: $instance_name"
+        log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（缓存已禁用）==="
         return 0
     fi
     
     # Check if state file exists
     if [[ ! -f "$state_file" ]]; then
-        log_debug "State file does not exist: $state_file"
-        log_debug "=== SHOULD_CREATE_INSTANCE DEBUG END: ALLOW (no state file) ==="
+        log_debug "状态文件不存在: $state_file"
+        log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（无状态文件）==="
         return 0
     fi
     
     # If state expired, allow creation
     if is_state_expired "$state_file"; then
-        log_debug "State expired, allowing instance creation: $instance_name"
-        log_debug "=== SHOULD_CREATE_INSTANCE DEBUG END: ALLOW (state expired) ==="
+        log_debug "状态已过期，允许创建实例: $instance_name"
+        log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（状态已过期）==="
         return 0
     fi
     
@@ -638,14 +647,14 @@ should_create_instance() {
     case "$instance_name" in
         "a1-flex-sg")
             shape="VM.Standard.A1.Flex"
-            log_debug "Mapped instance '$instance_name' to shape '$shape' (direct mapping)"
+            log_debug "已将实例 '$instance_name' 映射到形状 '$shape'（直接映射）"
             ;;
         "e2-micro-sg")
             shape="VM.Standard.E2.1.Micro"
-            log_debug "Mapped instance '$instance_name' to shape '$shape' (direct mapping)"
+            log_debug "已将实例 '$instance_name' 映射到形状 '$shape'（直接映射）"
             ;;
         *)
-            log_debug "No direct mapping for instance name '$instance_name'"
+            log_debug "实例名称 '$instance_name' 无直接映射"
             ;;
     esac
     
@@ -654,11 +663,11 @@ should_create_instance() {
         case "$instance_name" in
             *"a1"*|*"A1"*|*"flex"*|*"Flex"*|*"arm"*|*"ARM"*)
                 shape="VM.Standard.A1.Flex"
-                log_debug "Mapped instance '$instance_name' to shape '$shape' (pattern: ARM/A1/Flex)"
+                log_debug "已将实例 '$instance_name' 映射到形状 '$shape'（模式: ARM/A1/Flex）"
                 ;;
             *"e2"*|*"E2"*|*"micro"*|*"Micro"*|*"amd"*|*"AMD"*)
                 shape="VM.Standard.E2.1.Micro"
-                log_debug "Mapped instance '$instance_name' to shape '$shape' (pattern: AMD/E2/Micro)"
+                log_debug "已将实例 '$instance_name' 映射到形状 '$shape'（模式: AMD/E2/Micro）"
                 ;;
         esac
     fi
@@ -666,7 +675,7 @@ should_create_instance() {
     # Method 3: Environment variable fallback (medium priority)
     if [[ -z "$shape" && -n "${OCI_SHAPE:-}" ]]; then
         shape="$OCI_SHAPE"
-        log_debug "Using shape from environment for instance $instance_name: $shape (env fallback)"
+        log_debug "使用环境变量中的形状 $instance_name: $shape（环境回退）"
     fi
     
     # Method 4: Check instance state for existing shape information
@@ -675,57 +684,57 @@ should_create_instance() {
         cached_shape=$(jq -r ".instances[\"$instance_name\"].shape // \"\"" "$state_file" 2>/dev/null || echo "")
         if [[ -n "$cached_shape" && "$cached_shape" != "null" ]]; then
             shape="$cached_shape"
-            log_debug "Retrieved shape from cached instance state for $instance_name: $shape (cached shape)"
+            log_debug "从缓存实例状态获取形状 $instance_name: $shape（缓存形状）"
         fi
     fi
     
     # Log final result
     if [[ -n "$shape" ]]; then
-        log_debug "Final shape mapping for instance '$instance_name': '$shape'"
+        log_debug "实例 '$instance_name' 的最终形状映射: '$shape'"
     else
-        log_debug "Could not determine shape for instance '$instance_name' - limit checking will be skipped"
+        log_debug "无法确定实例 '$instance_name' 的形状 - 将跳过限额检查"
     fi
     
     # If we have a shape, check if its limit is reached
     if [[ -n "$shape" ]]; then
-        log_debug "Checking limit state for shape: $shape"
+        log_debug "正在检查形状限额状态: $shape"
         if get_cached_limit_state "$shape" "$state_file"; then
-            log_info "Free tier limit reached for shape $shape (instance: $instance_name), skipping creation"
-            log_debug "=== SHOULD_CREATE_INSTANCE DEBUG END: SKIP (limit reached) ==="
+            log_info "形状 $shape 免费层限额已达（实例: $instance_name），跳过创建"
+            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 跳过（限额已达）==="
             return 1  # Don't create - limit reached
         else
-            log_debug "No limit reached for shape $shape"
+            log_debug "形状 $shape 未达限额"
         fi
     else
-        log_debug "No shape determined, cannot check limits"
+        log_debug "未确定形状，无法检查限额"
     fi
     
     # If instance not in state, allow creation
     if ! instance_exists_in_state "$instance_name" "$state_file"; then
-        log_debug "Instance not in state, allowing creation: $instance_name"
-        log_debug "=== SHOULD_CREATE_INSTANCE DEBUG END: ALLOW (not in state) ==="
+        log_debug "实例不在状态中，允许创建: $instance_name"
+        log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（不在状态中）==="
         return 0
     fi
     
     # Check instance status
     local status
     status=$(get_instance_state "$instance_name" "$state_file" "status")
-    log_debug "Instance '$instance_name' found in state with status: '$status'"
+    log_debug "在状态中找到实例 '$instance_name'，状态: '$status'"
     
     case "$status" in
         "created"|"verified"|"running")
-            log_info "Instance exists in state with status '$status', skipping creation: $instance_name"
-            log_debug "=== SHOULD_CREATE_INSTANCE DEBUG END: SKIP (exists with status $status) ==="
+            log_info "实例在状态中存在，状态 '$status'，跳过创建: $instance_name"
+            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 跳过（存在，状态 $status）==="
             return 1  # Don't create
             ;;
         "failed"|"terminated")
-            log_info "Instance exists in state with status '$status', allowing recreation: $instance_name"
-            log_debug "=== SHOULD_CREATE_INSTANCE DEBUG END: ALLOW (recreation for status $status) ==="
+            log_info "实例在状态中存在，状态 '$status'，允许重新创建: $instance_name"
+            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（重新创建，状态 $status）==="
             return 0  # Allow creation
             ;;
         *)
-            log_debug "Instance exists in state with unknown status '$status', allowing creation: $instance_name"
-            log_debug "=== SHOULD_CREATE_INSTANCE DEBUG END: ALLOW (unknown status $status) ==="
+            log_debug "实例在状态中存在，未知状态 '$status'，允许创建: $instance_name"
+            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（未知状态 $status）==="
             return 0  # Allow creation for safety
             ;;
     esac
@@ -762,7 +771,7 @@ cleanup_state_manager() {
     # Cleanup temporary files
     rm -f "${state_file}.tmp" "${state_file}.bak"
     
-    log_debug "State manager cleanup completed"
+    log_debug "状态管理器清理完成"
 }
 
 # =============================================================================
@@ -787,7 +796,7 @@ get_state_summary() {
     
     # Convert Unix timestamp to readable format for display
     if [[ "$updated" =~ ^[0-9]+$ ]] && [[ "$updated" != "unknown" ]]; then
-        updated_readable=$(date -r "$updated" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || echo "$updated")
+        updated_readable=$(format_timestamp "$updated")
     else
         updated_readable="$updated"
     fi
@@ -806,9 +815,9 @@ print_state() {
     fi
     
     echo "=== Instance State Summary ==="
-    echo "Cache enabled: $(get_cache_enabled)"
+    echo "缓存启用: $(get_cache_enabled)"
     echo "Cache TTL: $(get_cache_ttl_hours) hours" 
-    echo "State file: $state_file"
+    echo "状态文件: $state_file"
     echo "Summary: $(get_state_summary "$state_file")"
     echo
     
@@ -825,7 +834,7 @@ print_state() {
             # Convert Unix timestamp to readable format
             local created_readable
             if [[ "$created" =~ ^[0-9]+$ ]]; then
-                created_readable=$(date -r "$created" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || echo "$created")
+                created_readable=$(format_timestamp "$created")
             else
                 created_readable="$created"
             fi
@@ -849,7 +858,7 @@ verify_instance_configuration() {
     local expected_memory="${4:-}"
     
     if [[ -z "$instance_id" || -z "$expected_shape" ]]; then
-        log_error "verify_instance_configuration: instance_id and expected_shape are required"
+        log_error "verify_instance_configuration: instance_id 和 expected_shape 为必填项"
         return 1
     fi
     
@@ -858,7 +867,7 @@ verify_instance_configuration() {
     if ! actual_config=$(oci_cmd compute instance get --instance-id "$instance_id" \
         --query 'data.{shape:shape,ocpus:shapeConfig.ocpus,memory:shapeConfig.memoryInGBs}' \
         --output json 2>/dev/null); then
-        log_error "Failed to get instance configuration for $instance_id"
+        log_error "获取实例 $instance_id 配置失败"
         return 1
     fi
     
@@ -870,7 +879,7 @@ verify_instance_configuration() {
     
     # Verify shape matches
     if [[ "$actual_shape" != "$expected_shape" ]]; then
-        log_warning "Instance shape mismatch: expected '$expected_shape', got '$actual_shape'"
+        log_warning "实例形状不匹配: 期望 '$expected_shape'，实际 '$actual_shape'"
         return 2
     fi
     
@@ -878,7 +887,7 @@ verify_instance_configuration() {
     if [[ -n "$expected_ocpus" && "$actual_ocpus" != "null" ]]; then
         if ! awk -v actual="$actual_ocpus" -v expected="$expected_ocpus" \
             'BEGIN { exit (actual != expected) }' 2>/dev/null; then
-            log_warning "Instance OCPUs mismatch: expected '$expected_ocpus', got '$actual_ocpus'"
+            log_warning "实例 OCPU 不匹配: 期望 '$expected_ocpus'，实际 '$actual_ocpus'"
             return 2
         fi
     fi
@@ -887,12 +896,12 @@ verify_instance_configuration() {
     if [[ -n "$expected_memory" && "$actual_memory" != "null" ]]; then
         if ! awk -v actual="$actual_memory" -v expected="$expected_memory" \
             'BEGIN { exit (actual != expected) }' 2>/dev/null; then
-            log_warning "Instance memory mismatch: expected '${expected_memory}GB', got '${actual_memory}GB'"
+            log_warning "实例内存不匹配: 期望 '${expected_memory}GB'，实际 '${actual_memory}GB'"
             return 2
         fi
     fi
     
-    log_debug "Instance configuration verified: shape=$actual_shape, ocpus=$actual_ocpus, memory=${actual_memory}GB"
+    log_debug "实例配置已验证: 形状=$actual_shape, OCPU=$actual_ocpus, 内存=${actual_memory}GB"
     return 0
 }
 
@@ -935,10 +944,10 @@ update_instance_state_with_config() {
           } | .updated = ($timestamp | tonumber)' \
           "$state_file" > "$temp_file"; then
         mv "$temp_file" "$state_file"
-        log_debug "Updated instance state with configuration: $instance_name"
+        log_debug "已更新实例状态及配置: $instance_name"
     else
         rm -f "$temp_file"
-        log_error "Failed to update instance state with configuration: $instance_name"
+        log_error "更新实例状态及配置失败: $instance_name"
         return 1
     fi
 }
@@ -965,7 +974,7 @@ get_cache_stats() {
     updated=$(jq -r '.updated' "$stats_file" 2>/dev/null)
     if [[ "$updated" =~ ^[0-9]+$ ]]; then
         local updated_readable
-        updated_readable=$(date -r "$updated" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || echo "$updated")
+        updated_readable=$(format_timestamp "$updated")
         echo "Last updated: $updated_readable"
     fi
 }
@@ -977,14 +986,14 @@ purge_cache() {
     
     if [[ -d "$cache_dir" ]]; then
         rm -rf "$cache_dir"
-        log_info "Cache purged: $cache_dir"
+        log_info "缓存已清除: $cache_dir"
     else
-        log_debug "Cache directory does not exist: $cache_dir"
+        log_debug "缓存目录不存在: $cache_dir"
     fi
     
     # Reinitialize empty state
     init_state_manager >/dev/null
-    log_info "Cache and state management reset"
+    log_info "缓存和状态管理已重置"
 }
 
 # Check cache health
@@ -1045,20 +1054,20 @@ get_cached_limit_state() {
     local state_file
     state_file=$(get_state_file_path "${2:-}")
     
-    log_debug "=== GET_CACHED_LIMIT_STATE DEBUG START ==="
-    log_debug "Shape: $shape"
-    log_debug "State file: $state_file"
+    log_debug "=== GET_CACHED_LIMIT_STATE 调试开始 ==="
+    log_debug "形状: $shape"
+    log_debug "状态文件: $state_file"
     
     if [[ ! -f "$state_file" ]]; then
-        log_debug "State file does not exist: $state_file"
-        log_debug "=== GET_CACHED_LIMIT_STATE DEBUG END: NO_LIMIT (no file) ==="
+        log_debug "状态文件不存在: $state_file"
+        log_debug "=== GET_CACHED_LIMIT_STATE 调试结束: 无限额（无文件）==="
         return 1  # No cache = no limit cached
     fi
     
     # Check if limits section exists
     if ! jq -e '.limits' "$state_file" >/dev/null 2>&1; then
-        log_debug "No limits section in state file"
-        log_debug "=== GET_CACHED_LIMIT_STATE DEBUG END: NO_LIMIT (no limits section) ==="
+        log_debug "状态文件中无 limits 部分"
+        log_debug "=== GET_CACHED_LIMIT_STATE 调试结束: 无限额（无 limits 部分）==="
         return 1  # No limits section = no limit cached
     fi
     
@@ -1067,15 +1076,15 @@ get_cached_limit_state() {
     case "$shape" in
         "VM.Standard.E2.1.Micro")
             limit_field="e2_limit_reached"
-            log_debug "Mapped shape '$shape' to limit field '$limit_field'"
+            log_debug "已将形状 '$shape' 映射到限额字段 '$limit_field'"
             ;;
         "VM.Standard.A1.Flex")
             limit_field="a1_limit_reached"
-            log_debug "Mapped shape '$shape' to limit field '$limit_field'"
+            log_debug "已将形状 '$shape' 映射到限额字段 '$limit_field'"
             ;;
         *)
-            log_warning "Unknown shape for limit checking: $shape"
-            log_debug "=== GET_CACHED_LIMIT_STATE DEBUG END: NO_LIMIT (unknown shape) ==="
+            log_warning "限额检查的未知形状: $shape"
+            log_debug "=== GET_CACHED_LIMIT_STATE 调试结束: 无限额（未知形状）==="
             return 1
             ;;
     esac
@@ -1086,31 +1095,31 @@ get_cached_limit_state() {
     ttl_hours=$(jq -r ".limits.ttl_hours // 24" "$state_file")
     current_time=$(date +%s)
     
-    log_debug "Limit cache TTL check:"
-    log_debug "  Last check: $last_check ($(date -r "$last_check" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "invalid"))"
-    log_debug "  Current time: $current_time ($(date -r "$current_time" '+%Y-%m-%d %H:%M:%S'))"
+    log_debug "限额缓存 TTL 检查:"
+    log_debug "  上次检查: $last_check ($(format_timestamp "$last_check" '+%Y-%m-%d %H:%M:%S'))"
+    log_debug "  当前时间: $current_time ($(format_timestamp "$current_time" '+%Y-%m-%d %H:%M:%S'))"
     log_debug "  TTL hours: $ttl_hours"
     log_debug "  Age in seconds: $((current_time - last_check))"
     log_debug "  Max age in seconds: $((ttl_hours * 3600))"
     
     if [[ $((current_time - last_check)) -gt $((ttl_hours * 3600)) ]]; then
-        log_debug "Limit cache expired for $shape (TTL: ${ttl_hours}h)"
-        log_debug "=== GET_CACHED_LIMIT_STATE DEBUG END: NO_LIMIT (cache expired) ==="
+        log_debug "形状 $shape 的限额缓存已过期 (TTL: ${ttl_hours}h)"
+        log_debug "=== GET_CACHED_LIMIT_STATE 调试结束: 无限额（缓存过期）==="
         return 1  # Cache expired
     fi
     
     # Check the specific limit flag
     local limit_reached
     limit_reached=$(jq -r ".limits.$limit_field // false" "$state_file")
-    log_debug "Limit field '$limit_field' value: '$limit_reached'"
+    log_debug "限额字段 '$limit_field' 值: '$limit_reached'"
     
     if [[ "$limit_reached" == "true" ]]; then
-        log_debug "Cached limit reached for $shape"
-        log_debug "=== GET_CACHED_LIMIT_STATE DEBUG END: LIMIT_REACHED ==="
+        log_debug "形状 $shape 的缓存限额已达"
+        log_debug "=== GET_CACHED_LIMIT_STATE 调试结束: 限额已达 ==="
         return 0  # Limit is cached as reached
     else
-        log_debug "No cached limit for $shape (value: $limit_reached)"
-        log_debug "=== GET_CACHED_LIMIT_STATE DEBUG END: NO_LIMIT (not reached) ==="
+        log_debug "形状 $shape 无缓存限额（值: $limit_reached）"
+        log_debug "=== GET_CACHED_LIMIT_STATE 调试结束: 无限额（未达限额）==="
         return 1  # No limit cached
     fi
 }
@@ -1132,7 +1141,7 @@ set_cached_limit_state() {
             limit_field="a1_limit_reached"
             ;;
         *)
-            log_warning "Unknown shape for limit setting: $shape"
+            log_warning "限额设置的未知形状: $shape"
             return 1
             ;;
     esac
@@ -1153,10 +1162,10 @@ set_cached_limit_state() {
            .updated = ($timestamp | tonumber)' \
           "$state_file" > "$temp_file"; then
         mv "$temp_file" "$state_file"
-        log_debug "Updated cached limit state: $shape -> $limit_reached"
+        log_debug "已更新缓存限额状态: $shape -> $limit_reached"
     else
         rm -f "$temp_file"
-        log_error "Failed to update cached limit state: $shape"
+        log_error "更新缓存限额状态失败: $shape"
         return 1
     fi
     
@@ -1183,10 +1192,10 @@ clear_cached_limit_states() {
            .updated = ($timestamp | tonumber)' \
           "$state_file" > "$temp_file"; then
         mv "$temp_file" "$state_file"
-        log_info "Cleared all cached limit states"
+        log_info "已清除所有缓存限额状态"
     else
         rm -f "$temp_file"
-        log_error "Failed to clear cached limit states"
+        log_error "清除缓存限额状态失败"
         return 1
     fi
     
@@ -1221,7 +1230,7 @@ get_limit_status() {
     # Convert timestamp for display
     local last_check_readable
     if [[ "$last_check" =~ ^[0-9]+$ ]] && [[ "$last_check" != "0" ]]; then
-        last_check_readable=$(date -r "$last_check" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || echo "$last_check")
+        last_check_readable=$(format_timestamp "$last_check")
     else
         last_check_readable="Never"
     fi

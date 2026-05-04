@@ -48,11 +48,11 @@ record_attempt_context() {
     local context_info="$1"
     
     if [[ "$PATTERN_ANALYSIS_ENABLED" != "true" ]]; then
-        log_debug "Pattern analysis disabled - skipping context recording"
+        log_debug "模式分析已禁用 - 跳过上下文记录"
         return 0
     fi
     
-    log_info "Recording attempt context for adaptive scheduling analysis"
+    log_info "正在记录自适应调度分析的尝试上下文"
     
     # Get existing pattern data
     local existing_data=""
@@ -77,7 +77,7 @@ record_attempt_context() {
         # Validate data size to ensure we stay well under GitHub's 64KB limit
         local data_size=${#updated_data}
         if [[ $data_size -gt 60000 ]]; then
-            log_warning "Pattern data approaching size limit (${data_size}/64KB) - reducing to 40 entries for safety"
+            log_warning "模式数据接近大小限制（${data_size}/64KB）- 为安全起见缩减至 40 条"
             updated_data=$(echo "$updated_data" | jq '.[-40:]' 2>/dev/null || echo "[$new_entry]")
             data_size=${#updated_data}
         fi
@@ -101,13 +101,13 @@ record_attempt_context() {
             else
                 retry_count=$((retry_count + 1))
                 if [[ $retry_count -lt $max_retries ]]; then
-                    log_info "GitHub API failure, retrying... ($retry_count/$max_retries)"
+                    log_info "GitHub API 失败，正在重试...（$retry_count/$max_retries）"
                     sleep $((2 * retry_count))  # Exponential backoff: 2s, 4s, 6s
                 else
-                    log_error "Failed to update pattern tracking data after $max_retries attempts"
-                    log_error "REMEDIATION: Check GitHub token permissions (needs 'variables: write' scope) and network connectivity"
-                    log_error "IMPACT: Scheduling optimization will continue with existing data, but pattern learning is disabled"
-                    log_warning "Consider verifying: 1) GitHub token is valid, 2) Repository has Actions enabled, 3) No API rate limits exceeded"
+                    log_error "在 $max_retries 次尝试后仍无法更新模式追踪数据"
+                    log_error "修复建议: 检查 GitHub token 权限（需要 'variables: write' 范围）和网络连接"
+                    log_error "影响: 调度优化将继续使用现有数据，但模式学习已禁用"
+                    log_warning "请验证: 1) GitHub token 有效，2) 仓库已启用 Actions，3) 未超出 API 速率限制"
                 fi
             fi
         done
@@ -120,11 +120,11 @@ record_attempt_context() {
 # Analyze success patterns and provide optimization recommendations  
 analyze_success_patterns() {
     if [[ "$PATTERN_ANALYSIS_ENABLED" != "true" ]]; then
-        log_info "Pattern analysis disabled - using default scheduling strategy"
+        log_info "模式分析已禁用 - 使用默认调度策略"
         return 0
     fi
     
-    log_info "Analyzing historical success patterns for scheduling optimization"
+    log_info "正在分析历史成功模式以优化调度"
     
     # Get pattern data
     local pattern_data=""
@@ -133,7 +133,7 @@ analyze_success_patterns() {
     fi
     
     if [[ -z "$pattern_data" || "$pattern_data" == "[]" ]]; then
-        log_info "No historical pattern data available - using baseline scheduling"
+        log_info "无历史模式数据 - 使用基线调度"
         return 0
     fi
     
@@ -144,17 +144,17 @@ analyze_success_patterns() {
         
         if [[ $total_attempts -gt 0 ]]; then
             local success_rate=$((success_attempts * 100 / total_attempts))
-            log_info "Pattern Analysis: $success_attempts successes in $total_attempts attempts (${success_rate}% success rate)"
+            log_info "模式分析: $total_attempts 次尝试中 $success_attempts 次成功（成功率 ${success_rate}%）"
             
             # Analyze success by time window
             analyze_time_patterns "$pattern_data"
         else
-            log_info "No pattern data for analysis yet"
+            log_info "尚无模式数据可供分析"
         fi
     else
         log_warning "jq not available - skipping detailed pattern analysis"
-        log_warning "REMEDIATION: Install 'jq' package to enable detailed scheduling pattern analysis and recommendations"
-        log_info "Basic pattern tracking will continue without detailed analytics"
+        log_warning "修复建议: 安装 'jq' 包以启用详细的调度模式分析和建议"
+        log_info "基本模式追踪将继续，但不包含详细分析"
     fi
 }
 
@@ -175,7 +175,7 @@ analyze_time_patterns() {
     ' 2>/dev/null || echo "")
     
     if [[ -n "$hour_analysis" ]]; then
-        log_info "Success pattern by hour (UTC): $hour_analysis"
+        log_info "按小时统计的成功模式 (UTC): $hour_analysis"
     fi
     
     # Provide recommendations based on patterns
@@ -186,14 +186,14 @@ analyze_time_patterns() {
 provide_scheduling_recommendations() {
     local pattern_data="$1"
     
-    log_info "=== ADAPTIVE SCHEDULING RECOMMENDATIONS ==="
+    log_info "=== 自适应调度建议 ==="
     
     # Current schedule effectiveness
     local current_context=$(get_current_context)
     local schedule_type=$(echo "$current_context" | cut -d'|' -f1)
     local region_info=$(echo "$current_context" | cut -d'|' -f2)
     
-    log_info "Current schedule: $schedule_type ($region_info)"
+    log_info "当前调度: $schedule_type ($region_info)"
     
     # Check if we should adjust strategy based on recent patterns
     if command -v jq >/dev/null 2>&1; then
@@ -201,9 +201,9 @@ provide_scheduling_recommendations() {
         local recent_successes=$(echo "$pattern_data" | jq '[.[] | select(.timestamp >= (now - 86400 | strftime("%Y-%m-%dT%H:%M:%S.%3NZ")) and .type == "success")] | length' 2>/dev/null || echo "0")
         
         if [[ $recent_failures -gt 5 && $recent_successes -eq 0 ]]; then
-            log_info "RECOMMENDATION: High recent failure rate - consider adjusting time windows"
+            log_info "建议: 近期失败率较高 - 考虑调整时间窗口"
         elif [[ $recent_successes -gt 0 ]]; then
-            log_info "RECOMMENDATION: Recent success detected - current strategy effective"
+            log_info "建议: 检测到近期成功 - 当前策略有效"
         fi
     fi
     
@@ -252,7 +252,7 @@ should_skip_attempt() {
         local success_count=$(echo "$recent_attempts_in_hour" | jq '[.[] | select(.type == "success")] | length')
 
         if [[ $(echo "$recent_attempts_in_hour" | jq 'length') -ge 5 && "$failure_count" -ge 5 && "$success_count" -eq 0 ]]; then
-            log_info "Adaptive Skip: The last 5 attempts in hour $current_hour_utc UTC have failed. Skipping this attempt."
+            log_info "自适应跳过: 最近 5 次在 $current_hour_utc UTC 小时的尝试均失败。跳过本次尝试。"
             return 0 # Skip this attempt
         fi
     fi
@@ -260,20 +260,20 @@ should_skip_attempt() {
     # Get current context for logging
     local current_context=$(get_current_context)
     local schedule_type=$(echo "$current_context" | cut -d'|' -f1)
-    log_debug "Schedule context: $schedule_type - proceeding with attempt"
+    log_debug "调度上下文: $schedule_type - 继续尝试"
     return 1  # Don't skip
 }
 
 # Main adaptive scheduler function
 main() {
-    log_info "=== ADAPTIVE SCHEDULING INTELLIGENCE ==="
+    log_info "=== 自适应调度智能 ==="
     
     # Get current timing context
     local current_context=$(get_current_context)
     IFS='|' read -r schedule_type region_info timestamp <<< "$current_context"
     
-    log_info "Schedule Context: $schedule_type"
-    log_info "Regional Context: $region_info"
+    log_info "调度上下文: $schedule_type"
+    log_info "区域上下文: $region_info"
     
     # Record this attempt for pattern learning
     record_attempt_context "$current_context"
@@ -283,11 +283,11 @@ main() {
     
     # Check if we should skip this attempt based on patterns
     if should_skip_attempt; then
-        log_info "Adaptive intelligence suggests skipping this attempt window"
+        log_info "自适应智能建议跳过本次尝试窗口"
         exit 2  # Special exit code for intelligent skip
     fi
     
-    log_info "Adaptive analysis complete - proceeding with instance creation attempt"
+    log_info "自适应分析完成 - 继续实例创建尝试"
 }
 
 # Run main function if called directly

@@ -23,7 +23,7 @@ regions:
     free_tier_available: true
 
   ap-mumbai-1:
-    name: "Asia Pacific (Mumbai)"
+    name: "亚太（孟买）"
     availability_domains:
       - "TFmX:AP-MUMBAI-1-AD-1"
     free_tier_available: true
@@ -36,7 +36,7 @@ regions:
 
   # Europe regions
   eu-frankfurt-1:
-    name: "Europe (Frankfurt)"
+    name: "欧洲（法兰克福）"
     availability_domains:
       - "FeVO:EU-FRANKFURT-1-AD-1"
       - "FeVO:EU-FRANKFURT-1-AD-2"
@@ -44,13 +44,13 @@ regions:
     free_tier_available: true
 
   eu-amsterdam-1:
-    name: "Europe (Amsterdam)"
+    name: "欧洲（阿姆斯特丹）"
     availability_domains:
       - "EMib:EU-AMSTERDAM-1-AD-1"
     free_tier_available: true
 
   uk-london-1:
-    name: "UK South (London)"
+    name: "英国南部（伦敦）"
     availability_domains:
       - "jbkU:UK-LONDON-1-AD-1"
       - "jbkU:UK-LONDON-1-AD-2"
@@ -88,7 +88,7 @@ regions:
 
   # South America regions
   sa-saopaulo-1:
-    name: "South America (São Paulo)"
+    name: "南美（圣保罗）"
     availability_domains:
       - "GGaP:SA-SAOPAULO-1-AD-1"
     free_tier_available: true

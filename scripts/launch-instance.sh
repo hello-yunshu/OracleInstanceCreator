@@ -17,7 +17,7 @@ INTERRUPTED=false
 # Signal handler for graceful shutdown
 cleanup_on_signal() {
     local signal="$1"
-    log_warning "Received signal $signal - initiating graceful shutdown..."
+    log_warning "收到信号 $signal - 正在优雅关闭..."
     INTERRUPTED=true
     
     # Kill any background processes if needed
@@ -26,7 +26,7 @@ cleanup_on_signal() {
         wait "$SLEEP_PID" 2>/dev/null || true
     fi
     
-    log_info "Graceful shutdown completed"
+    log_info "优雅关闭完成"
     exit 130  # Standard exit code for Ctrl+C
 }
 
@@ -39,7 +39,7 @@ interruptible_sleep() {
     local duration="$1"
     local message="${2:-Waiting}"
     
-    log_info "$message ${duration}s..."
+    log_info "$message ${duration}秒..."
     
     # Check if already interrupted
     if [[ "$INTERRUPTED" == true ]]; then
@@ -58,7 +58,7 @@ interruptible_sleep() {
         # Sleep was interrupted
         unset SLEEP_PID
         if [[ "$INTERRUPTED" == true ]]; then
-            log_info "Sleep interrupted by signal"
+            log_info "休眠被信号中断"
             return 1
         fi
         return 0
@@ -74,10 +74,10 @@ determine_compartment() {
     
     if [[ -z "${OCI_COMPARTMENT_ID:-}" ]]; then
         comp_id="$OCI_TENANCY_OCID"
-        log_info "Using tenancy OCID as compartment"
+        log_info "使用租户 OCID 作为区间"
     else
         comp_id="$OCI_COMPARTMENT_ID"
-        log_info "Using specified compartment"
+        log_info "使用指定区间"
     fi
     
     echo "$comp_id"
@@ -93,7 +93,7 @@ lookup_image_id() {
     
     if [[ -n "${OCI_IMAGE_ID:-}" ]]; then
         image_id="$OCI_IMAGE_ID"
-        log_info "Using specified image ID"
+        log_info "使用指定的镜像 ID"
     else
         # Try common cached image IDs first
         local cache_key="${operating_system}_${os_version}_${OCI_SHAPE}"
@@ -102,21 +102,21 @@ lookup_image_id() {
                 # Common Oracle Linux 10 ARM image ID - update as needed
                 image_id="${OCI_CACHED_OL10_ARM_IMAGE:-}"
                 if [[ -n "$image_id" ]]; then
-                    log_info "Using cached Oracle Linux 10 ARM image ID"
+                    log_info "使用缓存的 Oracle Linux 10 ARM 镜像 ID"
                 fi
                 ;;
             "Oracle Linux_10_VM.Standard.E2.1.Micro")
                 # Common Oracle Linux 10 AMD image ID - update as needed
                 image_id="${OCI_CACHED_OL10_AMD_IMAGE:-}"
                 if [[ -n "$image_id" ]]; then
-                    log_info "Using cached Oracle Linux 10 AMD image ID"
+                    log_info "使用缓存的 Oracle Linux 10 AMD 镜像 ID"
                 fi
                 ;;
         esac
         
         # Fallback to API lookup if no cached image
         if [[ -z "$image_id" ]]; then
-            log_info "Looking up latest image for OS $operating_system $os_version..."
+            log_info "正在查找操作系统 $operating_system $os_version 的最新镜像..."
             
             image_id=$(oci_cmd compute image list \
                 --compartment-id "$comp_id" \
@@ -136,7 +136,7 @@ lookup_image_id() {
                 die "$error_msg"
             fi
             
-            log_info "Found image ID: $image_id"
+            log_info "找到镜像 ID: $image_id"
         fi
     fi
     
@@ -147,7 +147,7 @@ check_existing_instance() {
     local comp_id="$1"
     local existing_id
     
-    log_info "Checking for existing instance: $INSTANCE_DISPLAY_NAME"
+    log_info "检查已有实例: $INSTANCE_DISPLAY_NAME"
     
     existing_id=$(oci_cmd compute instance list \
         --compartment-id "$comp_id" \
@@ -157,7 +157,7 @@ check_existing_instance() {
         --raw-output)
     
     if [[ -n "$existing_id" && "$existing_id" != "null" ]]; then
-        log_info "Instance '$INSTANCE_DISPLAY_NAME' already exists (OCID: $existing_id)"
+        log_info "实例 '$INSTANCE_DISPLAY_NAME' 已存在 (OCID: $existing_id)"
         echo "EXISTS"
         return 0
     fi
@@ -230,14 +230,14 @@ build_launch_command() {
         "--subnet-id" "$OCI_SUBNET_ID"
         "--display-name" "$INSTANCE_DISPLAY_NAME"
         "--assign-private-dns-record" "true"
-        "--ssh-authorized-keys-file" "$HOME/.ssh/private_key_pub.pem"
+        "--ssh-authorized-keys-file" "$HOME/.ssh/public_key.pub"
     )
     
     if [[ -n "${BOOT_VOLUME_ID:-}" ]]; then
         launch_args+=(
             "--boot-volume-id" "$BOOT_VOLUME_ID"
         )
-        log_info "Using existing boot volume: ${BOOT_VOLUME_ID}"
+        log_info "使用已有引导卷: ${BOOT_VOLUME_ID}"
     else
         launch_args+=(
             "--image-id" "$image_id"
@@ -273,7 +273,7 @@ build_launch_command() {
         local boot_volume_size="${BOOT_VOLUME_SIZE:-50}"
         if [[ "$boot_volume_size" -lt 50 ]]; then
             boot_volume_size=50
-            log_warning "Boot volume size increased to minimum 50GB"
+            log_warning "引导卷大小已增加至最低 50GB"
         fi
         launch_args+=(
             "--boot-volume-size-in-gbs" "$boot_volume_size"
@@ -354,15 +354,15 @@ launch_instance() {
     available_ads_string=$(get_available_ads "$OCI_AD")
     
     if [[ -z "$available_ads_string" ]]; then
-        log_warning "Circuit breaker has filtered out all ADs - all have too many recent failures"
-        log_info "Will try again later when circuit breakers reset"
+        log_warning "熔断器已过滤掉所有 AD - 均有过多近期失败"
+    log_info "将在熔断器重置后重试"
         return 0  # Treat as capacity issue - retry later
     fi
     
     local ad_list
     IFS=',' read -ra ad_list <<< "$available_ads_string"
     
-    log_info "Available ADs after circuit breaker filtering: $available_ads_string"
+    log_info "熔断器过滤后可用的 AD: $available_ads_string"
     
     # Try each AD until success or all ADs exhausted
     local ad_index=0
@@ -373,12 +373,12 @@ launch_instance() {
     while [[ $ad_index -lt $max_attempts ]]; do
         # Check for interruption signal
         if [[ "$INTERRUPTED" == true ]]; then
-            log_info "Instance launch interrupted by signal - exiting gracefully"
+            log_info "实例启动被信号中断 - 正在优雅退出"
             return 130
         fi
         
         local current_ad="${ad_list[$ad_index]}"
-        log_info "Attempting to launch instance '$INSTANCE_DISPLAY_NAME' in AD $current_ad (attempt $((ad_index + 1))/$max_attempts)..."
+        log_info "正在 AD $current_ad 中尝试启动实例 '$INSTANCE_DISPLAY_NAME'（第 $((ad_index + 1))/$max_attempts 次尝试）..."
         
         # Build launch command for current AD
         local launch_args
@@ -413,8 +413,8 @@ launch_instance() {
         case "$error_type" in
             "USER_LIMIT_REACHED")
                 # User has reached free tier limits - this is expected behavior, not an error
-                log_info "User limit reached for shape ${OCI_SHAPE:-unknown} - no further attempts needed"
-                log_info "Free tier limit reached. Consider managing existing instances to free capacity."
+                log_info "形状 ${OCI_SHAPE:-unknown} 已达用户限额 - 无需继续尝试"
+            log_info "免费层限额已达。请考虑管理现有实例以释放容量。"
                 
                 # This is a terminal condition - no point trying other ADs for user limits
                 log_performance_metric "USER_LIMIT_REACHED" "${OCI_SHAPE:-unknown}" "$((ad_index + 1))" "$max_attempts" "TERMINAL"
@@ -434,19 +434,19 @@ launch_instance() {
                 
                 # Try next AD if available
                 if [[ $((ad_index + 1)) -lt $max_attempts ]]; then
-                    log_info "Trying next availability domain..."
+                    log_info "尝试下一个可用性域..."
                     ((ad_index++))
                     continue
                 else
                     log_performance_metric "AD_CYCLE_COMPLETE" "ALL_ADS" "$max_attempts" "$max_attempts" "CAPACITY_EXHAUSTED"
-                    log_info "All ADs exhausted - will retry on next schedule"
+                    log_info "所有 AD 已穷尽 - 将在下次调度时重试"
                     return "$OCI_EXIT_CAPACITY_ERROR"  # Capacity issue across all ADs
                 fi
                 ;;
             "RATE_LIMIT")
                 # Rate limit detected - this is expected Oracle behavior
-                log_info "Rate limit detected for shape ${OCI_SHAPE:-unknown} in AD $current_ad (attempt $((ad_index + 1))/$max_attempts)"
-                log_info "This is normal Oracle API behavior - will retry on next scheduled workflow run"
+                log_info "在 AD $current_ad 中检测到形状 ${OCI_SHAPE:-unknown} 的速率限制（第 $((ad_index + 1))/$max_attempts 次尝试）"
+            log_info "这是 Oracle API 的正常行为 - 将在下次调度的工作流运行中重试"
                 
                 # No tracking as failure - this is expected operational behavior
                 log_performance_metric "RATE_LIMIT_DETECTED" "$current_ad" "$((ad_index + 1))" "$max_attempts" "EXPECTED"
@@ -457,7 +457,7 @@ launch_instance() {
                 ;;
             "LIMIT_EXCEEDED")
                 # Special case: check if instance was created despite error
-                log_info "LimitExceeded error - checking if instance was created anyway..."
+                log_info "LimitExceeded 错误 - 检查实例是否仍然创建成功..."
                 if verify_instance_creation "$comp_id" "${INSTANCE_VERIFY_MAX_CHECKS:-5}" "${INSTANCE_VERIFY_DELAY:-30}"; then
                     return 0  # Instance was created successfully
                 fi
@@ -467,11 +467,11 @@ launch_instance() {
                 
                 # Try next AD if available
                 if [[ $((ad_index + 1)) -lt $max_attempts ]]; then
-                    log_info "Trying next availability domain after LimitExceeded..."
+                    log_info "LimitExceeded 后尝试下一个可用性域..."
                     ((ad_index++))
                     continue
                 else
-                    log_info "All ADs exhausted after LimitExceeded errors"
+                    log_info "LimitExceeded 错误后所有 AD 已穷尽"
                     return 0
                 fi
                 ;;
@@ -487,11 +487,11 @@ launch_instance() {
                     local backoff_delay
                     backoff_delay=$(calculate_exponential_backoff "$retry_count" 5 40)
                     
-                    log_info "Transient $error_type error - retrying same AD attempt $retry_count/$transient_retry_max (backoff: ${backoff_delay}s)..."
+                    log_info "瞬时 $error_type 错误 - 在同一 AD 重试第 $retry_count/$transient_retry_max 次（退避: ${backoff_delay}s）..."
                     
                     # Wait before retry using exponential backoff
                     if ! interruptible_sleep "$backoff_delay" "Exponential backoff before retry on same AD"; then
-                        log_info "Sleep interrupted - exiting gracefully"
+                        log_info "休眠被中断 - 正在优雅退出"
                         return 130  # Signal interrupted
                     fi
                     
@@ -517,7 +517,7 @@ launch_instance() {
                     
                     # If it's no longer a transient error, stop retrying same AD
                     if [[ "$retry_error_type" != "INTERNAL_ERROR" && "$retry_error_type" != "NETWORK" ]]; then
-                        log_info "Error type changed from $error_type to $retry_error_type - stopping same-AD retries"
+                        log_info "错误类型从 $error_type 变为 $retry_error_type - 停止同 AD 重试"
                         should_retry_same_ad=false
                         # Set the new error type for downstream processing
                         error_type="$retry_error_type"
@@ -531,12 +531,12 @@ launch_instance() {
                 # If we still have a transient error after retries, try next AD
                 if [[ "$error_type" == "INTERNAL_ERROR" || "$error_type" == "NETWORK" ]]; then
                     if [[ $((ad_index + 1)) -lt $max_attempts ]]; then
-                        log_info "All retries exhausted for $current_ad - trying next availability domain..."
+                        log_info "$current_ad 的所有重试已穷尽 - 尝试下一个可用性域..."
                         ((ad_index++))
                         continue
                     else
                         # All ADs attempted with transient errors - treat as temporary capacity issue
-                        log_info "All ADs and retries exhausted with transient errors - will retry on next schedule"
+                        log_info "所有 AD 和重试因瞬时错误穷尽 - 将在下次调度时重试"
                         return 0
                     fi
                 else
@@ -544,17 +544,17 @@ launch_instance() {
                     case "$error_type" in
                         "CAPACITY")
                             if [[ $((ad_index + 1)) -lt $max_attempts ]]; then
-                                log_info "Trying next availability domain after capacity error during retry..."
+                                log_info "重试期间容量错误后尝试下一个可用性域..."
                                 ((ad_index++))
                                 continue
                             else
-                                log_info "All ADs exhausted - will retry on next schedule"
+                                log_info "所有 AD 已穷尽 - 将在下次调度时重试"
                                 return 0
                             fi
                             ;;
                         "RATE_LIMIT")
                             # Rate limit during retry - exit immediately, no further attempts
-                            log_info "Rate limit encountered during retry - exiting"
+                            log_info "重试期间遇到速率限制 - 退出"
                             return "$OCI_EXIT_RATE_LIMIT_ERROR"
                             ;;
                         "AUTH"|"CONFIG")
@@ -588,7 +588,7 @@ launch_instance() {
         # Add delay between AD attempts if configured
         if [[ $wait_time -gt 0 && $((ad_index + 1)) -lt $max_attempts ]]; then
             if ! interruptible_sleep "$wait_time" "Waiting before trying next AD"; then
-                log_info "Sleep interrupted - exiting gracefully"
+                log_info "休眠被中断 - 正在优雅退出"
                 return 130  # Signal interrupted
             fi
         fi
@@ -597,7 +597,7 @@ launch_instance() {
     done
     
     # Should not reach here, but handle gracefully
-    log_info "All availability domains attempted - will retry on next schedule"
+    log_info "所有可用性域已尝试 - 将在下次调度时重试"
     return 0
 }
 
@@ -653,12 +653,12 @@ handle_launch_error_with_ad() {
     
     case "$error_type" in
         "USER_LIMIT_REACHED")
-            log_info "User limit reached for shape ${OCI_SHAPE:-unknown} in AD $current_ad (attempt $attempt/$max_attempts)"
-            log_info "This indicates the free tier limit has been reached (E2: 2/2 instances, A1: 4/4 OCPUs)"
+            log_info "形状 ${OCI_SHAPE:-unknown} 在 AD $current_ad 中已达用户限额（第 $attempt/$max_attempts 次尝试）"
+            log_info "这表示免费层限额已达（E2: 2/2 实例，A1: 4/4 OCPU）"
             
             # Update cached limit state to prevent future attempts
             if [[ "${CACHE_ENABLED:-true}" == "true" && -n "${OCI_SHAPE:-}" ]]; then
-                log_info "Caching limit state for shape: ${OCI_SHAPE}"
+                log_info "缓存形状限额状态: ${OCI_SHAPE}"
                 set_cached_limit_state "${OCI_SHAPE}" "true" "${state_file:-instance-state.json}"
             fi
             
@@ -666,40 +666,40 @@ handle_launch_error_with_ad() {
             return 0
             ;;
         "ORACLE_CAPACITY_UNAVAILABLE")
-            log_info "Oracle capacity unavailable for shape in AD $current_ad (attempt $attempt/$max_attempts)"
-            log_info "This is a transient Oracle Cloud capacity constraint"
+            log_info "AD $current_ad 中形状的 Oracle 容量不可用（第 $attempt/$max_attempts 次尝试）"
+            log_info "这是 Oracle Cloud 的瞬时容量限制"
             echo "ORACLE_CAPACITY_UNAVAILABLE"
             return 0
             ;;
         "CAPACITY")
-            log_info "No capacity available for shape in AD $current_ad (attempt $attempt/$max_attempts)"
+            log_info "AD $current_ad 中形状无可用容量（第 $attempt/$max_attempts 次尝试）"
             echo "CAPACITY"
             return 0
             ;;
         "RATE_LIMIT")
-            log_info "Rate limit detected in AD $current_ad (attempt $attempt/$max_attempts)"
+            log_info "在 AD $current_ad 中检测到速率限制（第 $attempt/$max_attempts 次尝试）"
             echo "RATE_LIMIT"
             return 0
             ;;
         "LIMIT_EXCEEDED")
-            log_info "LimitExceeded error in AD $current_ad (attempt $attempt/$max_attempts)"
+            log_info "AD $current_ad 中 LimitExceeded 错误（第 $attempt/$max_attempts 次尝试）"
             echo "LIMIT_EXCEEDED"
             return 0
             ;;
         "DUPLICATE")
-            log_info "Instance with this name already exists. Skipping creation."
+            log_info "同名实例已存在。跳过创建。"
             # No notification needed - instance exists is an expected condition when using state management
             echo "DUPLICATE"
             return 0
             ;;
         "AUTH")
-            log_error "Authentication/authorization error in AD $current_ad"
+            log_error "AD $current_ad 中认证/授权错误"
             send_telegram_notification "critical" "OCI authentication error: Check credentials and permissions"
             echo "AUTH"
             return 0
             ;;
         "CONFIG")
-            log_error "Configuration error detected in AD $current_ad"
+            log_error "AD $current_ad 中检测到配置错误"
             local error_line
             error_line=$(echo "$error_output" | head -1)
             send_telegram_notification "critical" "OCI configuration error: ${error_line}"
@@ -707,17 +707,17 @@ handle_launch_error_with_ad() {
             return 0
             ;;
         "INTERNAL_ERROR")
-            log_warning "Internal/gateway error detected in AD $current_ad - will retry"
+            log_warning "AD $current_ad 中检测到内部/网关错误 - 将重试"
             echo "INTERNAL_ERROR"
             return 0
             ;;
         "NETWORK")
-            log_warning "Network error detected in AD $current_ad - will retry"
+            log_warning "AD $current_ad 中检测到网络错误 - 将重试"
             echo "NETWORK"
             return 0
             ;;
         *)
-            log_error "Unexpected error during instance launch in AD $current_ad"
+            log_error "AD $current_ad 中实例启动时发生意外错误"
             local error_line
             error_line=$(echo "$error_output" | head -1)
             send_telegram_notification "error" "OCI instance launch failed in $current_ad: ${error_line}"
@@ -754,10 +754,10 @@ verify_instance_creation() {
     local check_delay="${3:-30}"
     
     local total_timeout=$((max_checks * check_delay))
-    log_info "Verifying instance creation with $max_checks checks (${check_delay}s intervals, ${total_timeout}s total timeout)..."
+    log_info "正在验证实例创建，共 $max_checks 次检查（间隔 ${check_delay}s，总超时 ${total_timeout}s）..."
     
     for ((i=1; i<=max_checks; i++)); do
-        log_info "Instance verification check $i/$max_checks..."
+        log_info "实例验证检查 $i/$max_checks..."
         
         local instance_id
         instance_id=$(oci_cmd compute instance list \
@@ -775,11 +775,11 @@ verify_instance_creation() {
                 --query 'data."lifecycle-state"' \
                 --raw-output 2>/dev/null || echo "")
             
-            log_success "Instance found: $instance_id (state: $state)"
+            log_success "找到实例: $instance_id（状态: $state）"
             
             # Record instance creation in state cache
             if [[ "${CACHE_ENABLED:-true}" == "true" ]]; then
-                log_info "Recording instance creation in state cache: ${INSTANCE_DISPLAY_NAME:-default}"
+                log_info "在状态缓存中记录实例创建: ${INSTANCE_DISPLAY_NAME:-default}"
                 record_instance_verification "${INSTANCE_DISPLAY_NAME:-default}" "$instance_id" "verified" "${state_file:-instance-state.json}"
             fi
             
@@ -795,20 +795,20 @@ verify_instance_creation() {
         
         if [[ $i -lt $max_checks ]]; then
             if ! interruptible_sleep "$check_delay" "Instance not found yet, waiting before next check"; then
-                log_info "Verification interrupted - exiting gracefully"
+                log_info "验证被中断 - 正在优雅退出"
                 return 130
             fi
         fi
     done
     
-    log_warning "Instance verification failed after $max_checks checks"
+    log_warning "在 $max_checks 次检查后实例验证失败"
     return 1
 }
 
 # Main function
 launch_oci_instance() {
     start_timer "total_execution"
-    log_info "Starting OCI instance launch process for shape: ${OCI_SHAPE:-<not set>}"
+    log_info "开始 OCI 实例启动流程，形状: ${OCI_SHAPE:-<未设置>}"
     
     # Initialize AD metrics tracking
     init_metrics
@@ -827,18 +827,18 @@ launch_oci_instance() {
     # Initialize state management and check cache first (if enabled)
     local state_file="instance-state.json"
     if [[ "${CACHE_ENABLED:-true}" == "true" ]]; then
-        log_info "Initializing state management system..."
+        log_info "正在初始化状态管理系统..."
         start_timer "state_cache_check"
         init_state_manager "$state_file" >/dev/null
         
         # Check if instance should be created based on cache state
         if ! should_create_instance "${INSTANCE_DISPLAY_NAME:-default}" "$state_file"; then
-            log_info "Instance exists in cache and is valid, skipping creation: ${INSTANCE_DISPLAY_NAME:-default}"
+            log_info "实例在缓存中存在且有效，跳过创建: ${INSTANCE_DISPLAY_NAME:-default}"
             log_elapsed "state_cache_check"
             log_elapsed "total_execution"
             return 0
         else
-            log_info "Cache indicates instance should be created: ${INSTANCE_DISPLAY_NAME:-default}"
+            log_info "缓存指示应创建实例: ${INSTANCE_DISPLAY_NAME:-default}"
         fi
         log_elapsed "state_cache_check"
     fi
@@ -851,19 +851,20 @@ launch_oci_instance() {
         log_elapsed "existing_instance_check"
         
         if [[ "$instance_status" == "EXISTS" ]]; then
-            log_info "Skipping creation - instance already exists"
+            log_info "跳过创建 - 实例已存在"
             log_elapsed "total_execution"
             return 0
         fi
     else
-        log_info "Skipping existing instance check - attempting direct launch"
+        log_info "跳过已有实例检查 - 直接尝试启动"
     fi
     
     if [[ -n "${BOOT_VOLUME_ID:-}" ]]; then
-        log_info "BOOT_VOLUME_ID is set - skipping image lookup, using existing boot volume"
-        image_id=""
+        log_info "BOOT_VOLUME_ID 已设置 - 跳过镜像查找，使用已有引导卷"
+        local image_id=""
     else
         start_timer "image_lookup"
+        local image_id
         image_id=$(lookup_image_id "$comp_id")
         log_elapsed "image_lookup"
     fi

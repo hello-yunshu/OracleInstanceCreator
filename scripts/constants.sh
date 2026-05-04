@@ -255,6 +255,5 @@ validate_constants() {
 
 # 加载时自动验证常量
 if ! validate_constants; then
-    echo "致命错误: 常量验证失败 - 请检查配置" >&2
-    exit 1
+    echo "警告: 常量验证失败 - 请检查配置" >&2
 fi

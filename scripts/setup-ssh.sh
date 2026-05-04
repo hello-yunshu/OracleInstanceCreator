@@ -17,8 +17,8 @@ setup_ssh_config() {
     mkdir -p ~/.ssh
     
     # Create SSH public key file
-    echo "${INSTANCE_SSH_PUBLIC_KEY}" > ~/.ssh/private_key_pub.pem
-    chmod 644 ~/.ssh/private_key_pub.pem
+    echo "${INSTANCE_SSH_PUBLIC_KEY}" > ~/.ssh/public_key.pub
+    chmod 644 ~/.ssh/public_key.pub
     
     log_success "SSH 公钥配置完成"
 }

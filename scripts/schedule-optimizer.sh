@@ -40,7 +40,7 @@ get_regional_schedule() {
 generate_cron_patterns() {
     local region="${OCI_REGION:-ap-singapore-1}"
     
-    log_info "Generating optimized cron patterns for region: $region"
+    log_info "正在为区域生成优化的 cron 模式: $region"
     
     case "$region" in
         # Singapore: Business hours 9am-6pm SGT = 1am-10am UTC
@@ -85,7 +85,7 @@ generate_cron_patterns() {
             ;;
             
         *)
-            log_warning "Unknown region $region, using Singapore default"
+            log_warning "未知区域 $region，使用新加坡默认值"
             echo "# Default Singapore-optimized schedule"
             echo 'schedule_aggressive: "*/15 2-7 * * *"'
             echo 'schedule_conservative: "0 8-23,0-1 * * *"'
@@ -128,29 +128,29 @@ calculate_monthly_usage() {
 
 # Recommend schedule adjustments based on success patterns
 recommend_adjustments() {
-    log_info "=== SCHEDULE OPTIMIZATION RECOMMENDATIONS ==="
+    log_info "=== 调度优化建议 ==="
     
     # Get current regional pattern
     local regional_info=$(get_regional_schedule)
     IFS='|' read -r timezone utc_offset optimal_window <<< "$regional_info"
     
-    log_info "Region: ${OCI_REGION:-ap-singapore-1}"
-    log_info "Timezone: $timezone ($utc_offset)"
-    log_info "Optimal window: $optimal_window"
+    log_info "区域: ${OCI_REGION:-ap-singapore-1}"
+    log_info "时区: $timezone ($utc_offset)"
+    log_info "最优窗口: $optimal_window"
     
     # Generate optimized cron patterns
     log_info ""
-    log_info "=== OPTIMIZED CRON PATTERNS ==="
+    log_info "=== 优化的 CRON 模式 ==="
     generate_cron_patterns
     
     # Calculate usage estimates
     log_info ""
-    log_info "=== MONTHLY USAGE ESTIMATE ==="
+    log_info "=== 月度使用估算 ==="
     calculate_monthly_usage "*/15 2-7 * * *" "0 8-23,0-1 * * *" "*/20 1-6 * * 6,0"
     
     # Pattern-based recommendations
     log_info ""
-    log_info "=== ADAPTIVE RECOMMENDATIONS ==="
+    log_info "=== 自适应建议 ==="
     
     if [[ -n "${GITHUB_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
         local pattern_data=$(gh variable get SUCCESS_PATTERN_DATA 2>/dev/null || echo "[]")
@@ -160,16 +160,16 @@ recommend_adjustments() {
             local success_hours=$(echo "$pattern_data" | jq -r '[.[] | select(.type == "success")] | group_by(.hour_utc) | .[] | "\(.[0].hour_utc):\(length)"' 2>/dev/null || echo "")
             
             if [[ -n "$success_hours" ]]; then
-                log_info "Historical success by hour (UTC): $success_hours"
+                log_info "按小时统计的历史成功 (UTC): $success_hours"
                 log_info "💡 Consider concentrating attempts during successful hours"
             else
-                log_info "No historical success data available yet"
+                log_info "尚无历史成功数据"
             fi
         else
-            log_info "Pattern analysis unavailable (jq not installed or no data)"
+            log_info "模式分析不可用（jq 未安装或无数据）"
         fi
     else
-        log_info "Pattern data unavailable (GitHub CLI not available)"
+        log_info "模式数据不可用（GitHub CLI 不可用）"
     fi
     
     log_info "================================================"
@@ -177,17 +177,17 @@ recommend_adjustments() {
 
 # Main function
 main() {
-    log_info "=== SCHEDULE OPTIMIZER ==="
+    log_info "=== 调度优化器 ==="
     
     # Show current configuration
-    log_info "Current region: ${OCI_REGION:-ap-singapore-1}"
-    log_info "Adaptive scheduling: ${ENABLE_ADAPTIVE_SCHEDULING:-true}"
-    log_info "Region optimization: ${ENABLE_REGION_OPTIMIZATION:-true}"
+    log_info "当前区域: ${OCI_REGION:-ap-singapore-1}"
+    log_info "自适应调度: ${ENABLE_ADAPTIVE_SCHEDULING:-true}"
+    log_info "区域优化: ${ENABLE_REGION_OPTIMIZATION:-true}"
     
     # Generate recommendations
     recommend_adjustments
     
-    log_info "Schedule optimization analysis complete"
+    log_info "调度优化分析完成"
 }
 
 # Run main function if called directly
