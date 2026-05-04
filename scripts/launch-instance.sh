@@ -235,7 +235,7 @@ build_launch_command() {
     
     if [[ -n "${BOOT_VOLUME_ID:-}" ]]; then
         launch_args+=(
-            "--boot-volume-id" "$BOOT_VOLUME_ID"
+            "--source-boot-volume-id" "$BOOT_VOLUME_ID"
         )
         log_info "使用已有引导卷: ${BOOT_VOLUME_ID}"
     else
