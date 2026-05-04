@@ -5,7 +5,7 @@
 profiles:
   # Default ARM instance (current configuration)
   arm-singapore:
-    description: "ARM-based instance in Singapore"
+    description: "新加坡 ARM 实例"
     region: "ap-singapore-1"
     availability_domain: "fgaj:AP-SINGAPORE-1-AD-1"
     shape: "VM.Standard.A1.Flex"
@@ -17,7 +17,7 @@ profiles:
 
   # Alternative AMD instance
   amd-singapore:
-    description: "AMD-based micro instance in Singapore"
+    description: "新加坡 AMD 微型实例"
     region: "ap-singapore-1"
     availability_domain: "fgaj:AP-SINGAPORE-1-AD-1"
     shape: "VM.Standard.E2.1.Micro"

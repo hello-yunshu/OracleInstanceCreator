@@ -542,7 +542,7 @@ class OracleInstanceDashboard {
             document.getElementById('instance-trend').textContent = trend;
             
         } catch (error) {
-            document.getElementById('instance-status').textContent = 'Unknown';
+            document.getElementById('instance-status').textContent = '未知';
             document.getElementById('instance-trend').textContent = 'Error fetching status';
         }
     }
@@ -597,7 +597,7 @@ class OracleInstanceDashboard {
             const patternData = variables.variables?.find(v => v.name === 'SUCCESS_PATTERN_DATA');
             
             let successRate = 0;
-            let trend = 'No data available';
+            let trend = '暂无数据';
             
             if (patternData) {
                 try {
@@ -1048,7 +1048,7 @@ class OracleInstanceDashboard {
             const durationElement = element.querySelector('.run-duration');
             
             runs.push({
-                status: statusElement?.textContent || 'Unknown',
+                status: statusElement?.textContent || '未知',
                 created_at: timeElement?.textContent || new Date().toISOString(),
                 duration: durationElement?.textContent?.replace('s', '') || 0
             });
@@ -1232,7 +1232,7 @@ class OracleInstanceDashboard {
                     return { class: 'error', text: 'Failed' };
                 }
             case 'in_progress':
-                return { class: 'running', text: 'Running' };
+                return { class: 'running', text: '运行中' };
             default:
                 return { class: 'error', text: run.status };
         }

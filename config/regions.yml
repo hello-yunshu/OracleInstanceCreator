@@ -5,19 +5,19 @@
 regions:
   # Asia Pacific regions
   ap-singapore-1:
-    name: "Asia Pacific (Singapore)"
+    name: "亚太（新加坡）"
     availability_domains:
       - "fgaj:AP-SINGAPORE-1-AD-1"
     free_tier_available: true
 
   ap-sydney-1:
-    name: "Asia Pacific (Sydney)"
+    name: "亚太（悉尼）"
     availability_domains:
       - "TvRS:AP-SYDNEY-1-AD-1"
     free_tier_available: true
 
   ap-tokyo-1:
-    name: "Asia Pacific (Tokyo)"
+    name: "亚太（东京）"
     availability_domains:
       - "KQVh:AP-TOKYO-1-AD-1"
     free_tier_available: true
@@ -29,7 +29,7 @@ regions:
     free_tier_available: true
 
   ap-seoul-1:
-    name: "Asia Pacific (Seoul)"
+    name: "亚太（首尔）"
     availability_domains:
       - "nfYH:AP-SEOUL-1-AD-1"
     free_tier_available: true
@@ -59,7 +59,7 @@ regions:
 
   # North America regions
   us-ashburn-1:
-    name: "US East (Ashburn)"
+    name: "美东（阿什本）"
     availability_domains:
       - "oGHu:US-ASHBURN-1-AD-1"
       - "oGHu:US-ASHBURN-1-AD-2"
@@ -67,7 +67,7 @@ regions:
     free_tier_available: true
 
   us-phoenix-1:
-    name: "US West (Phoenix)"
+    name: "美西（凤凰城）"
     availability_domains:
       - "EMTh:US-PHOENIX-1-AD-1"
       - "EMTh:US-PHOENIX-1-AD-2"

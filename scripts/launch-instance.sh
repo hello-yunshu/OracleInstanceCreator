@@ -165,10 +165,62 @@ check_existing_instance() {
     echo "NOT_EXISTS"
 }
 
+handle_launch_success() {
+    local instance_id="$1"
+    local current_ad="$2"
+    local attempt_num="$3"
+    local total_attempts="$4"
+    local is_retry="${5:-false}"
+    local retry_count="${6:-0}"
+    
+    if [[ -z "$instance_id" ]]; then
+        if [[ "$is_retry" == "true" ]]; then
+            log_error "无法从重试输出中提取实例 OCID"
+            log_debug "原始重试输出: $output"
+        else
+            log_error "无法从输出中提取实例 OCID"
+            log_debug "原始输出: $output"
+        fi
+        return 1
+    fi
+    
+    local context
+    if [[ "$is_retry" == "true" ]]; then
+        context="{\"availability_domain\":\"$current_ad\",\"instance_ocid\":\"$instance_id\",\"retry_attempt\":$retry_count,\"total_retries\":$total_attempts}"
+        log_with_context "success" "重试后实例创建成功" "$context"
+        log_performance_metric "AD_SUCCESS_RETRY" "$current_ad" "$retry_count" "$total_attempts"
+        record_ad_result "$current_ad" "success" "RETRY_$retry_count"
+    else
+        context="{\"availability_domain\":\"$current_ad\",\"instance_ocid\":\"$instance_id\",\"attempt\":$attempt_num,\"max_attempts\":$total_attempts}"
+        log_with_context "success" "实例创建成功" "$context"
+        log_performance_metric "AD_SUCCESS" "$current_ad" "$attempt_num" "$total_attempts"
+        record_ad_result "$current_ad" "success" ""
+    fi
+    
+    mark_ad_success "$current_ad"
+    
+    if [[ "${CACHE_ENABLED:-true}" == "true" ]]; then
+        log_info "将实例创建记录写入状态缓存: ${INSTANCE_DISPLAY_NAME:-default}"
+        record_instance_creation "${INSTANCE_DISPLAY_NAME:-default}" "$instance_id" "${state_file:-instance-state.json}"
+    fi
+    
+    set_success_variable "$instance_id" "$current_ad"
+    
+    if [[ "$is_retry" == "true" ]]; then
+        record_success_pattern "$current_ad" "$retry_count" "$total_attempts"
+        send_telegram_notification "success" "OCI 实例在 $current_ad 重试 $retry_count 次后创建成功: ${INSTANCE_DISPLAY_NAME} (OCID: ${instance_id})"
+    else
+        record_success_pattern "$current_ad" "$attempt_num" "$total_attempts"
+        send_telegram_notification "success" "OCI 实例在 $current_ad 创建成功: ${INSTANCE_DISPLAY_NAME} (OCID: ${instance_id})"
+    fi
+    
+    return 0
+}
+
 build_launch_command() {
     local comp_id="$1"
     local image_id="$2"
-    local ad_name="${3:-$OCI_AD}"  # Allow override for multi-AD cycling
+    local ad_name="${3:-$OCI_AD}"
     
     local launch_args=(
         "compute" "instance" "launch"
@@ -176,13 +228,22 @@ build_launch_command() {
         "--compartment-id" "$comp_id"
         "--shape" "$OCI_SHAPE"
         "--subnet-id" "$OCI_SUBNET_ID"
-        "--image-id" "$image_id"
         "--display-name" "$INSTANCE_DISPLAY_NAME"
         "--assign-private-dns-record" "true"
         "--ssh-authorized-keys-file" "$HOME/.ssh/private_key_pub.pem"
     )
     
-    # Add shape configuration for flexible shapes
+    if [[ -n "${BOOT_VOLUME_ID:-}" ]]; then
+        launch_args+=(
+            "--boot-volume-id" "$BOOT_VOLUME_ID"
+        )
+        log_info "Using existing boot volume: ${BOOT_VOLUME_ID}"
+    else
+        launch_args+=(
+            "--image-id" "$image_id"
+        )
+    fi
+    
     if [[ "$OCI_SHAPE" == *"Flex" ]]; then
         launch_args+=(
             "--shape-config" 
@@ -190,36 +251,34 @@ build_launch_command() {
         )
     fi
     
-    # Set public IP assignment
     if [[ "$ASSIGN_PUBLIC_IP" == "true" ]]; then
         launch_args+=("--assign-public-ip" "true")
     else
         launch_args+=("--assign-public-ip" "false")
     fi
     
-    # Add availability configuration for auto-recovery
     local recovery_action="${RECOVERY_ACTION:-RESTORE_INSTANCE}"
     launch_args+=(
         "--availability-config"
         "{\"recoveryAction\": \"$recovery_action\"}"
     )
     
-    # Add instance options for IMDS compatibility
     local legacy_imds="${LEGACY_IMDS_ENDPOINTS:-false}"
     launch_args+=(
         "--instance-options"
         "{\"areLegacyImdsEndpointsDisabled\": $legacy_imds}"
     )
     
-    # Add configurable boot volume size
-    local boot_volume_size="${BOOT_VOLUME_SIZE:-50}"
-    if [[ "$boot_volume_size" -lt 50 ]]; then
-        boot_volume_size=50  # Ensure minimum 50GB
-        log_warning "Boot volume size increased to minimum 50GB"
+    if [[ -z "${BOOT_VOLUME_ID:-}" ]]; then
+        local boot_volume_size="${BOOT_VOLUME_SIZE:-50}"
+        if [[ "$boot_volume_size" -lt 50 ]]; then
+            boot_volume_size=50
+            log_warning "Boot volume size increased to minimum 50GB"
+        fi
+        launch_args+=(
+            "--boot-volume-size-in-gbs" "$boot_volume_size"
+        )
     fi
-    launch_args+=(
-        "--boot-volume-size-in-gbs" "$boot_volume_size"
-    )
     
     printf '%s\n' "${launch_args[@]}"
 }
@@ -338,40 +397,13 @@ launch_instance() {
         echo "$output"
         
         if [[ $status -eq 0 ]]; then
-            # Success! Extract instance OCID using robust parsing
             local instance_id
             instance_id=$(extract_instance_ocid "$output")
             
-            if [[ -z "$instance_id" ]]; then
-                log_error "Could not extract instance OCID from output"
-                log_debug "Raw output for debugging: $output"
-                return 1
+            if handle_launch_success "$instance_id" "$current_ad" "$((ad_index + 1))" "$max_attempts"; then
+                return 0
             fi
-            
-            # Use structured logging with context for better monitoring
-            local context="{\"availability_domain\":\"$current_ad\",\"instance_ocid\":\"$instance_id\",\"attempt\":$((ad_index + 1)),\"max_attempts\":$max_attempts}"
-            log_with_context "success" "Instance launched successfully" "$context"
-            
-            # Track successful AD for performance metrics and circuit breaker
-            log_performance_metric "AD_SUCCESS" "$current_ad" "$((ad_index + 1))" "$max_attempts"
-            record_ad_result "$current_ad" "success" ""
-            mark_ad_success "$current_ad"  # Reset circuit breaker for this AD
-            
-            # Record instance creation in state cache
-            if [[ "${CACHE_ENABLED:-true}" == "true" ]]; then
-                log_info "Recording instance creation in state cache: ${INSTANCE_DISPLAY_NAME:-default}"
-                record_instance_creation "${INSTANCE_DISPLAY_NAME:-default}" "$instance_id" "${state_file:-instance-state.json}"
-            fi
-            
-            # Set GitHub repository variable to prevent future runs
-            set_success_variable "$instance_id" "$current_ad"
-            
-            # Record success pattern for adaptive scheduling
-            record_success_pattern "$current_ad" "$((ad_index + 1))" "$max_attempts"
-            
-            send_telegram_notification "success" "OCI instance created in $current_ad: ${INSTANCE_DISPLAY_NAME} (OCID: ${instance_id})"
-            
-            return 0
+            return 1
         fi
         
         # Handle launch errors
@@ -470,39 +502,13 @@ launch_instance() {
                     set -e
                     
                     if [[ $status -eq 0 ]]; then
-                        # Success on retry! Extract instance OCID
                         local instance_id
                         instance_id=$(extract_instance_ocid "$output")
                         
-                        if [[ -z "$instance_id" ]]; then
-                            log_error "Could not extract instance OCID from retry output"
-                            log_debug "Raw retry output for debugging: $output"
-                            return 1
+                        if handle_launch_success "$instance_id" "$current_ad" "$((ad_index + 1))" "$max_attempts" "true" "$retry_count"; then
+                            return 0
                         fi
-                        
-                        local context="{\"availability_domain\":\"$current_ad\",\"instance_ocid\":\"$instance_id\",\"retry_attempt\":$retry_count,\"total_retries\":$transient_retry_max}"
-                        log_with_context "success" "Instance launched successfully after retry" "$context"
-                        
-                        # Track successful AD for performance metrics and circuit breaker
-                        log_performance_metric "AD_SUCCESS_RETRY" "$current_ad" "$retry_count" "$transient_retry_max"
-                        record_ad_result "$current_ad" "success" "RETRY_$retry_count"
-                        mark_ad_success "$current_ad"  # Reset circuit breaker for this AD
-                        
-                        # Record instance creation in state cache
-                        if [[ "${CACHE_ENABLED:-true}" == "true" ]]; then
-                            log_info "Recording instance creation in state cache: ${INSTANCE_DISPLAY_NAME:-default}"
-                            record_instance_creation "${INSTANCE_DISPLAY_NAME:-default}" "$instance_id" "${state_file:-instance-state.json}"
-                        fi
-                        
-                        # Set GitHub repository variable to prevent future runs
-                        set_success_variable "$instance_id" "$current_ad"
-                        
-                        # Record success pattern for adaptive scheduling
-                        record_success_pattern "$current_ad" "$retry_count" "$transient_retry_max"
-                        
-                        send_telegram_notification "success" "OCI instance created in $current_ad after $retry_count retries: ${INSTANCE_DISPLAY_NAME} (OCID: ${instance_id})"
-                        
-                        return 0
+                        return 1
                     fi
                     
                     # Check the error type again
@@ -853,13 +859,21 @@ launch_oci_instance() {
         log_info "Skipping existing instance check - attempting direct launch"
     fi
     
-    # Lookup or use provided image ID
-    start_timer "image_lookup"
-    local image_id
-    image_id=$(lookup_image_id "$comp_id")
-    log_elapsed "image_lookup"
-    
-    # Launch the instance
+    if [[ -n "${BOOT_VOLUME_ID:-}" ]]; then
+        log_info "BOOT_VOLUME_ID is set - skipping image lookup, using existing boot volume"
+        image_id=""
+    else
+        start_timer "image_lookup"
+        image_id=$(lookup_image_id "$comp_id")
+        log_elapsed "image_lookup"
+    fi
+
+    if [[ -n "${BOOT_VOLUME_ID:-}" ]]; then
+        start_timer "boot_volume_detach"
+        detach_boot_volume_if_attached "$comp_id" "$BOOT_VOLUME_ID"
+        log_elapsed "boot_volume_detach"
+    fi
+
     start_timer "instance_launch"
     launch_instance "$comp_id" "$image_id"
     log_elapsed "instance_launch"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Utility functions for Oracle Instance Creator scripts
+# Oracle Instance Creator 工具函数
 # Common functions for logging, error handling, and validation
 
 set -euo pipefail
@@ -25,7 +25,7 @@ else
     RESET=""
 fi
 
-# Logging functions with colors for clear output and optional JSON format
+# 带颜色的日志函数 for clear output and optional JSON format
 # Set LOG_FORMAT=json to enable structured logging
 
 log_json() {
@@ -108,7 +108,7 @@ log_with_context() {
     fi
 }
 
-# Timing functions for performance monitoring
+# 性能监控计时函数
 # Note: Using bash 4+ associative arrays if available, otherwise simple variables
 if [[ -n "${BASH_VERSION:-}" ]] && [[ ${BASH_VERSION%%.*} -ge 4 ]]; then
     declare -A TIMER_START_TIMES
@@ -154,7 +154,7 @@ log_elapsed() {
     fi
 }
 
-# Error handling
+# 错误处理
 die() {
     local message="$1"
     local exit_code="${2:-1}"  # Default to general error
@@ -332,8 +332,8 @@ oci_cmd_debug() {
     # Add timeout flags for faster failure on network issues
     # Connection timeout: 5s (down from 10s default)
     # Read timeout: 15s (down from 60s default) 
-    oci_args+=("--connection-timeout" "5")
-    oci_args+=("--read-timeout" "15")
+    oci_args+=("--connection-timeout" "${OCI_CONNECTION_TIMEOUT_SECONDS:-5}")
+    oci_args+=("--read-timeout" "${OCI_READ_TIMEOUT_SECONDS:-15}")
     
     # Create redacted command for secure logging
     local redacted_cmd_str
@@ -346,7 +346,7 @@ oci_cmd_debug() {
     set -e
     
     if [[ $status -ne 0 ]]; then
-        log_error "OCI debug command failed with status $status"
+        log_error "OCI 调试命令失败，状态码 $status"
         log_error "Command: ${cmd[*]}"
         log_error "Output: $output"
     fi
@@ -600,32 +600,22 @@ retry_with_backoff() {
         ((attempt++))
     done
     
-    log_error "Command failed after $max_attempts attempts"
+    log_error "命令在 $max_attempts 次尝试后失败"
     return 1
 }
 
-# Error handling standards for all scripts
-# Return codes convention:
-# 0 = Success/Continue
-# 1 = General error/failure
-# 2 = Capacity/rate limit (expected, retry later)
-# 3 = Configuration error (fix required)
-# 4 = Network/connectivity error (may resolve)
-# 124 = Timeout (GNU timeout standard)
+# 错误处理 standards for all scripts
+# 返回码约定：
+# 0 = 成功/继续
+# 1 = 一般错误/失败
+# 2 = 容量/速率限制（预期行为，稍后重试）
+# 3 = 配置错误（需要修复）
+# 4 = 网络/连接错误（可能自行恢复）
+# 124 = 超时（GNU timeout 标准）
 
-# Only define constants if not already defined (avoid readonly conflicts)
-if [[ -z "${OCI_EXIT_SUCCESS:-}" ]]; then
-    readonly OCI_EXIT_SUCCESS=0
-    readonly OCI_EXIT_GENERAL_ERROR=1
-    readonly OCI_EXIT_CAPACITY_ERROR=2
-    readonly OCI_EXIT_CONFIG_ERROR=3
-    readonly OCI_EXIT_NETWORK_ERROR=4
-    readonly OCI_EXIT_USER_LIMIT_ERROR=5
-    readonly OCI_EXIT_RATE_LIMIT_ERROR=6
-    readonly OCI_EXIT_TIMEOUT=124
-fi
+# 退出码常量已集中定义在 constants.sh 中
 
-# Constants are now centralized in constants.sh - sourced in init_script()
+# 常量已集中定义在 constants.sh 中 - 在 init_script() 中加载
 
 # Wait for result file with polling and timeout
 wait_for_result_file() {
@@ -886,21 +876,184 @@ validate_boot_volume_size() {
     
     # Check if it's a number
     if ! [[ "$size" =~ ^[0-9]+$ ]]; then
-        log_error "Boot volume size must be a number: $size"
+        log_error "引导卷大小必须是数字: $size"
         return 1
     fi
     
     # Check minimum size (Oracle requirement)
     if [[ "$size" -lt 50 ]]; then
-        log_error "Boot volume size must be at least 50GB: $size"
+        log_error "引导卷大小至少为 50GB: $size"
         return 1
     fi
     
     # Check reasonable maximum (10TB)
     if [[ "$size" -gt 10000 ]]; then
-        log_warning "Boot volume size seems very large: ${size}GB"
+        log_warning "引导卷大小似乎过大: ${size}GB"
     fi
     
+    return 0
+}
+
+find_boot_volume_for_instance() {
+    local comp_id="$1"
+    local instance_id="$2"
+    
+    local attachment_id
+    attachment_id=$(oci_cmd compute boot-volume-attachment list \
+        --compartment-id "$comp_id" \
+        --instance-id "$instance_id" \
+        --query 'data[0].id' \
+        --raw-output 2>/dev/null)
+    
+    if [[ -z "$attachment_id" || "$attachment_id" == "null" ]]; then
+        log_debug "No boot volume attachment found for instance: $instance_id"
+        echo ""
+        return 1
+    fi
+    
+    local boot_volume_id
+    boot_volume_id=$(oci_cmd compute boot-volume-attachment get \
+        --boot-volume-attachment-id "$attachment_id" \
+        --query 'data."boot-volume-id"' \
+        --raw-output 2>/dev/null)
+    
+    if [[ -z "$boot_volume_id" || "$boot_volume_id" == "null" ]]; then
+        log_debug "Could not retrieve boot volume ID from attachment: $attachment_id"
+        echo ""
+        return 1
+    fi
+    
+    echo "$boot_volume_id"
+    return 0
+}
+
+detach_boot_volume_if_attached() {
+    local comp_id="$1"
+    local boot_volume_id="$2"
+    
+    if [[ -z "$boot_volume_id" ]]; then
+        log_warning "未提供用于分离检查的引导卷 ID"
+        return 1
+    fi
+    
+    local attachment_id
+    attachment_id=$(oci_cmd compute boot-volume-attachment list \
+        --compartment-id "$comp_id" \
+        --boot-volume-id "$boot_volume_id" \
+        --lifecycle-state "ATTACHED" \
+        --query 'data[0].id' \
+        --raw-output 2>/dev/null)
+    
+    if [[ -z "$attachment_id" || "$attachment_id" == "null" ]]; then
+        log_info "引导卷 $boot_volume_id 当前未附加 - 可以使用"
+        return 0
+    fi
+    
+    local attached_instance_id
+    attached_instance_id=$(oci_cmd compute boot-volume-attachment get \
+        --boot-volume-attachment-id "$attachment_id" \
+        --query 'data."instance-id"' \
+        --raw-output 2>/dev/null)
+    
+    log_info "引导卷 $boot_volume_id 已附加到实例: ${attached_instance_id:-未知}"
+    log_info "正在分离引导卷: $attachment_id"
+    
+    local detach_output
+    detach_output=$(oci_cmd compute boot-volume-attachment detach \
+        --boot-volume-attachment-id "$attachment_id" \
+        --force 2>&1)
+    local detach_status=$?
+    
+    if [[ $detach_status -ne 0 ]]; then
+        log_error "分离引导卷失败: $detach_output"
+        return 1
+    fi
+    
+    log_info "等待引导卷分离完成..."
+    local max_wait=120
+    local wait_interval=10
+    local elapsed=0
+    
+    while [[ $elapsed -lt $max_wait ]]; do
+        local state
+        state=$(oci_cmd compute boot-volume-attachment get \
+            --boot-volume-attachment-id "$attachment_id" \
+            --query 'data."lifecycle-state"' \
+            --raw-output 2>/dev/null)
+        
+        if [[ -z "$state" || "$state" == "DETACHED" || "$state" == "null" ]]; then
+            log_info "引导卷在 ${elapsed}s 后成功分离"
+            return 0
+        fi
+        
+        log_debug "Boot volume state: $state, waiting ${wait_interval}s..."
+        sleep "$wait_interval"
+        elapsed=$((elapsed + wait_interval))
+    done
+    
+    log_warning "引导卷分离在 ${max_wait}s 后超时 - 继续执行"
+    return 0
+}
+
+terminate_instance_and_preserve_boot_volume() {
+    local comp_id="$1"
+    local instance_id="$2"
+    
+    if [[ -z "$instance_id" ]]; then
+        log_error "未提供要终止的实例 ID"
+        return 1
+    fi
+    
+    local boot_volume_id
+    boot_volume_id=$(find_boot_volume_for_instance "$comp_id" "$instance_id")
+    
+    if [[ -n "$boot_volume_id" ]]; then
+        log_info "找到实例 $instance_id 的引导卷: $boot_volume_id"
+    fi
+    
+    log_info "正在终止实例: $instance_id（保留引导卷）"
+    
+    local terminate_output
+    terminate_output=$(oci_cmd compute instance terminate \
+        --instance-id "$instance_id" \
+        --preserve-boot-volume "true" \
+        --force 2>&1)
+    local terminate_status=$?
+    
+    if [[ $terminate_status -ne 0 ]]; then
+        log_error "终止实例失败: $terminate_output"
+        return 1
+    fi
+    
+    log_info "等待实例终止..."
+    local max_wait=180
+    local wait_interval=15
+    local elapsed=0
+    
+    while [[ $elapsed -lt $max_wait ]]; do
+        local state
+        state=$(oci_cmd compute instance get \
+            --instance-id "$instance_id" \
+            --query 'data."lifecycle-state"' \
+            --raw-output 2>/dev/null)
+        
+        if [[ -z "$state" || "$state" == "TERMINATED" || "$state" == "null" ]]; then
+            log_info "实例在 ${elapsed}s 后成功终止"
+            if [[ -n "$boot_volume_id" ]]; then
+                echo "$boot_volume_id"
+            fi
+            return 0
+        fi
+        
+        log_debug "Instance state: $state, waiting ${wait_interval}s..."
+        sleep "$wait_interval"
+        elapsed=$((elapsed + wait_interval))
+    done
+    
+    log_warning "实例终止在 ${max_wait}s 后超时"
+    if [[ -n "$boot_volume_id" ]]; then
+        echo "$boot_volume_id"
+    fi
     return 0
 }
 
@@ -910,13 +1063,13 @@ validate_availability_domain() {
     
     # Check for empty input
     if [[ -z "$ad_list" ]]; then
-        log_error "Availability domain cannot be empty"
+        log_error "可用域不能为空"
         return 1
     fi
     
     # Check for leading/trailing commas or spaces
     if [[ "$ad_list" =~ ^[[:space:]]*,.* ]] || [[ "$ad_list" =~ .*,[[:space:]]*$ ]]; then
-        log_error "Invalid AD format: leading or trailing commas not allowed"
+        log_error "无效的 AD 格式: 不允许前导或尾随逗号"
         log_error "Found: '$ad_list'"
         return 1
     fi
@@ -999,7 +1152,7 @@ validate_timeout_value() {
 validate_configuration() {
     local validation_failed=false
     
-    log_info "Validating configuration values..."
+    log_info "正在验证配置值..."
     
     # Validate required variables don't have spaces
     # NOTE: OPERATING_SYSTEM excluded because "Oracle Linux" is valid and properly quoted
@@ -1107,7 +1260,7 @@ validate_configuration() {
     return 0
 }
 
-# Performance metrics logging for multi-AD optimization
+# 性能指标 logging for multi-AD optimization
 log_performance_metric() {
     local metric_type="$1"
     local ad_name="$2"

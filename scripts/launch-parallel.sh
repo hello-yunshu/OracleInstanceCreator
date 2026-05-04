@@ -102,6 +102,7 @@ declare -A A1_FLEX_CONFIG=(
     ["OCPUS"]="4"
     ["MEMORY_IN_GBS"]="24"
     ["DISPLAY_NAME"]="a1-flex-sg"
+    ["BOOT_VOLUME_ID"]="${A1_BOOT_VOLUME_ID:-}"
 )
 
 # shellcheck disable=SC2034  # Used via nameref in launch_shape()
@@ -172,6 +173,12 @@ launch_shape() {
     export OCI_OCPUS="${config[OCPUS]}"
     export OCI_MEMORY_IN_GBS="${config[MEMORY_IN_GBS]}"
     export INSTANCE_DISPLAY_NAME="${config[DISPLAY_NAME]}"
+    if [[ -n "${config[BOOT_VOLUME_ID]:-}" ]]; then
+        export BOOT_VOLUME_ID="${config[BOOT_VOLUME_ID]}"
+        log_info "Using existing boot volume for $shape_name: ${config[BOOT_VOLUME_ID]}"
+    else
+        unset BOOT_VOLUME_ID
+    fi
 
     # Launch the instance using existing script
     local script_dir
@@ -547,7 +554,7 @@ main() {
         if [[ "$should_launch_a1" == true ]]; then
             # Only override if no specific error code was already captured
             if [[ $STATUS_A1 -eq 1 ]]; then
-                STATUS_A1=$EXIT_TIMEOUT_ERROR
+                STATUS_A1=$OCI_EXIT_TIMEOUT
                 log_debug "A1 timeout applied (was launched, no specific error code)"
             else
                 log_debug "A1 timeout occurred but preserving error code $STATUS_A1 (capacity/limit detection)"
@@ -559,7 +566,7 @@ main() {
         if [[ "$should_launch_e2" == true ]]; then
             # Only override if no specific error code was already captured
             if [[ $STATUS_E2 -eq 1 ]]; then
-                STATUS_E2=$EXIT_TIMEOUT_ERROR
+                STATUS_E2=$OCI_EXIT_TIMEOUT
                 log_debug "E2 timeout applied (was launched, no specific error code)"
             else
                 log_debug "E2 timeout occurred but preserving error code $STATUS_E2 (capacity/limit detection)"
@@ -666,8 +673,12 @@ main() {
     if [[ "${LOG_FORMAT:-}" == "json" ]]; then
         local performance_context="{\"total_duration\":${elapsed},\"a1_duration\":${a1_duration}"
         performance_context="${performance_context},\"e2_duration\":${e2_duration},\"peak_memory\":${peak_memory}"
-        performance_context="${performance_context},\"success_count\":${success_count},\"parallel_efficiency\":"
-        performance_context+="$(((a1_duration + e2_duration) > 0 ? (a1_duration + e2_duration) * 100 / elapsed : 0))}"
+        local parallel_efficiency=0
+        local total_shape_duration=$((a1_duration + e2_duration))
+        if [[ $total_shape_duration -gt 0 && $elapsed -gt 0 ]]; then
+            parallel_efficiency=$((total_shape_duration * 100 / elapsed))
+        fi
+        performance_context="${performance_context},\"success_count\":${success_count},\"parallel_efficiency\":${parallel_efficiency}}"
         log_with_context "info" "Parallel execution performance summary" "$performance_context"
     fi
 

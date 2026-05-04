@@ -6,10 +6,10 @@ name: 'OCI Orchestrator - Infrastructure Deployment'
 
 on:
   # schedule:
-    # Four-tier optimization: 10-min off-peak weekdays, 15-min peak weekdays, 10-min all weekend (~4,320 runs/month)
+    # 四层优化策略: 10-min off-peak weekdays, 15-min peak weekdays, 10-min all weekend (~4,320 runs/month)
     # All schedules target Oracle Cloud optimal availability windows for maximum deployment success
 
-    # TIER 1: Off-peak aggressive (10-min intervals) - Weekdays only
+    # 第一层: 非高峰激进策略 (10-min intervals) - Weekdays only
     # UTC 2-7am = SGT 10am-3pm (lunch/afternoon lull)
     # UTC 2-7am = EST 9pm-2am (late evening/night)
     # UTC 2-7am = CET 3-8am (early morning)
@@ -88,8 +88,8 @@ jobs:
     outputs:
       script_exit_code: ${{ steps.launch-instances.outputs.script_exit_code }}
     env:
-      # Common configuration for both shapes
-      # Multi-AD support: Use comma-separated list for multiple ADs
+      # 两种形状的通用配置
+      # 多 AD 支持: 使用逗号分隔的列表指定多个 AD
       # Example: "fgaj:AP-SINGAPORE-1-AD-1,fgaj:AP-SINGAPORE-1-AD-2,fgaj:AP-SINGAPORE-1-AD-3"
       OCI_AD: "fgaj:AP-SINGAPORE-1-AD-1"
       OCI_SHAPE: "VM.Standard.A1.Flex"  # Default shape for validation (overridden per-shape)
@@ -99,27 +99,29 @@ jobs:
       ASSIGN_PUBLIC_IP: "false"
       OPERATING_SYSTEM: "Oracle Linux"
       OS_VERSION: "10"
-      # Boot volume configuration
+      # 引导卷配置
       BOOT_VOLUME_SIZE: "50"
-      # Instance recovery and compatibility settings
+      BOOT_VOLUME_ID: ""  # Set to an existing boot volume OCID to attach instead of creating new
+      A1_BOOT_VOLUME_ID: ""  # Boot volume OCID specifically for A1.Flex shape
+      # 实例恢复和兼容性设置
       RECOVERY_ACTION: "RESTORE_INSTANCE"
       LEGACY_IMDS_ENDPOINTS: "false"
-      # Retry configuration for multi-AD cycling
+      # 多 AD 循环的重试配置
       RETRY_WAIT_TIME: "30"
-      # Transient error retry configuration (retries on same AD before cycling)
+      # 瞬态错误重试配置（在同一 AD 重试后再切换）
       TRANSIENT_ERROR_MAX_RETRIES: "3"
       TRANSIENT_ERROR_RETRY_DELAY: "15"
-      # Instance verification timeout configuration
+      # 实例验证超时配置
       INSTANCE_VERIFY_MAX_CHECKS: "5"
       INSTANCE_VERIFY_DELAY: "30"
-      # Logging configuration (set to 'json' for structured logging)
+      # 日志配置（设为 'json' 启用结构化日志）
       LOG_FORMAT: "text"
-      # Cached image IDs for supported instance shapes (update periodically)
+      # 缓存镜像 ID（需定期更新）
       OCI_CACHED_OL10_ARM_IMAGE: "ocid1.image.oc1.ap-singapore-1.aaaaaaaay4vc5rcekxthq7cillis3qred5xyz7kmqd6wuaoknk4zukohqlua"
       OCI_CACHED_OL10_AMD_IMAGE: "ocid1.image.oc1.ap-singapore-1.aaaaaaaaitll52n3sr73g2gaclby2ph5whrmb5l3tbo47i6atle6z3cemr6a"
-      # Adaptive scheduling configuration
-      ENABLE_ADAPTIVE_SCHEDULING: ${{ inputs.adaptive_scheduling && 'true' || 'true' }}
-      ENABLE_REGION_OPTIMIZATION: ${{ inputs.region_optimization && 'true' || 'true' }}
+      # 自适应调度配置
+      ENABLE_ADAPTIVE_SCHEDULING: ${{ inputs.adaptive_scheduling && 'true' || 'false' }}
+      ENABLE_REGION_OPTIMIZATION: ${{ inputs.region_optimization && 'true' || 'false' }}
       ORACLE_REGION_TIMEZONE: "Asia/Singapore"
       SUCCESS_TRACKING_ENABLED: "true"
     steps:
@@ -281,7 +283,7 @@ jobs:
           # - OCI_CLI_DEBUG: Controls --debug flag for Oracle API request/response logging
           # - INTERNAL_DEBUG: Controls internal script logging and workflow debug steps
           
-          echo "=== LAUNCHING OCI INSTANCES (PARALLEL) ==="
+          echo "=== 启动 OCI 实例（并行）==="
           echo "Timestamp: $(date -Iseconds)"
           
           # Execute with explicit exit code capture and debugging

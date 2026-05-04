@@ -85,8 +85,14 @@ should_skip_ad() {
         # Calculate hours since last failure (simplified check)
         if command -v date >/dev/null 2>&1; then
             local last_epoch current_epoch hours_diff
-            if last_epoch=$(date -d "$last_failure_time" +%s 2>/dev/null) && 
-                current_epoch=$(date +%s 2>/dev/null); then
+            if last_epoch=$(date -d "$last_failure_time" +%s 2>/dev/null); then
+                current_epoch=$(date +%s 2>/dev/null)
+            elif [[ "$(uname)" == "Darwin" ]]; then
+                last_epoch=$(python3 -c "from datetime import datetime; print(int(datetime.fromisoformat('${last_failure_time}'.replace('Z','+00:00')).timestamp()))" 2>/dev/null) || \
+                last_epoch=$(perl -MTime::Local -e 'print Time::Local::timegm(reverse split(/[T:-]/,substr($ARGV[0],0,19)))' "$last_failure_time" 2>/dev/null)
+                current_epoch=$(date +%s 2>/dev/null)
+            fi
+            if [[ -n "$last_epoch" && -n "$current_epoch" ]]; then
                 hours_diff=$(( (current_epoch - last_epoch) / 3600 ))
                 
                 if [[ $hours_diff -ge $CIRCUIT_BREAKER_RESET_HOURS ]]; then
