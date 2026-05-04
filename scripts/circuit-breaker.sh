@@ -1,38 +1,50 @@
 #!/bin/bash
 
-# Circuit breaker pattern for Oracle Cloud Availability Domain failures
-# Prevents wasted attempts on consistently failing ADs by tracking failure patterns
-
 source "$(dirname "$0")/utils.sh"
 source "$(dirname "$0")/constants.sh"
 
-# Circuit breaker constants
 readonly MAX_CONSECUTIVE_FAILURES=3
 readonly CIRCUIT_BREAKER_RESET_HOURS=24
-readonly AD_FAILURE_DATA_VAR="AD_FAILURE_DATA"
+readonly AD_FAILURE_DATA_FILE="${AD_FAILURE_DATA_FILE:-ad-failure-data.json}"
 
-# Track AD failure counts in GitHub variables for persistence
-# Data format: JSON array of objects with ad, failures, last_failure_time
-# Example: [{"ad":"fgaj:AP-SINGAPORE-1-AD-1","failures":2,"last_failure":"2025-08-26T10:00:00Z"}]
+_get_failure_data_file() {
+    local state_dir="${STATE_DIR:-${GITHUB_WORKSPACE:-$HOME}/.cache/oci-state}"
+    echo "${state_dir}/${AD_FAILURE_DATA_FILE}"
+}
 
 get_ad_failure_data() {
-    local failure_data=""
+    local data_file
+    data_file=$(_get_failure_data_file)
     
-    # Try to get existing failure data from GitHub variables
-    if command -v gh >/dev/null 2>&1; then
-        failure_data=$(gh variable get "$AD_FAILURE_DATA_VAR" 2>/dev/null || echo "[]")
-    else
-        log_debug "GitHub CLI 不可用 - 使用空失败数据"
-        failure_data="[]"
+    if [[ -f "$data_file" ]]; then
+        local data
+        data=$(cat "$data_file" 2>/dev/null || echo "[]")
+        if echo "$data" | jq empty 2>/dev/null; then
+            echo "$data"
+            return 0
+        fi
+        log_debug "AD 失败数据文件格式无效 - 重置"
     fi
     
-    # Validate JSON structure
-    if ! echo "$failure_data" | jq empty 2>/dev/null; then
-        log_warning "失败数据格式无效 - 重置为空数组"
-        failure_data="[]"
+    echo "[]"
+}
+
+_save_failure_data() {
+    local data="$1"
+    local data_file
+    data_file=$(_get_failure_data_file)
+    
+    local dir
+    dir=$(dirname "$data_file")
+    mkdir -p "$dir" 2>/dev/null || true
+    
+    local temp_file="${data_file}.tmp"
+    if echo "$data" > "$temp_file" 2>/dev/null && mv "$temp_file" "$data_file" 2>/dev/null; then
+        return 0
     fi
     
-    echo "$failure_data"
+    rm -f "$temp_file" 2>/dev/null
+    return 1
 }
 
 get_ad_failure_count() {
@@ -68,44 +80,39 @@ should_skip_ad() {
     local ad="$1"
     local failure_count
     local last_failure_time
-    local current_time
     
     failure_count=$(get_ad_failure_count "$ad")
     
-    # If failure count is below threshold, don't skip
     if [[ $failure_count -lt $MAX_CONSECUTIVE_FAILURES ]]; then
-        return 1  # Don't skip
+        return 1
     fi
     
-    # Check if enough time has passed for circuit breaker reset
     last_failure_time=$(get_ad_last_failure_time "$ad")
     if [[ -n "$last_failure_time" ]]; then
-        current_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u)
+        local current_epoch last_epoch hours_diff
+        current_epoch=$(date +%s 2>/dev/null || echo "0")
         
-        # Calculate hours since last failure (simplified check)
-        if command -v date >/dev/null 2>&1; then
-            local last_epoch current_epoch hours_diff
-            if last_epoch=$(date -d "$last_failure_time" +%s 2>/dev/null); then
-                current_epoch=$(date +%s 2>/dev/null)
-            elif [[ "$(uname)" == "Darwin" ]]; then
-                last_epoch=$(python3 -c "from datetime import datetime; print(int(datetime.fromisoformat('${last_failure_time}'.replace('Z','+00:00')).timestamp()))" 2>/dev/null) || \
-                last_epoch=$(perl -MTime::Local -e 'print Time::Local::timegm(reverse split(/[T:-]/,substr($ARGV[0],0,19)))' "$last_failure_time" 2>/dev/null)
-                current_epoch=$(date +%s 2>/dev/null)
-            fi
-            if [[ -n "$last_epoch" && -n "$current_epoch" ]]; then
-                hours_diff=$(( (current_epoch - last_epoch) / 3600 ))
-                
-                if [[ $hours_diff -ge $CIRCUIT_BREAKER_RESET_HOURS ]]; then
-                    log_info "AD $ad 熔断器已重置（${hours_diff} 小时后）"
-                    reset_ad_failures "$ad"
-                    return 1  # Don't skip - circuit breaker reset
-                fi
+        if [[ "$(uname)" == "Darwin" ]]; then
+            last_epoch=$(python3 -c "from datetime import datetime; print(int(datetime.fromisoformat('${last_failure_time}'.replace('Z','+00:00')).timestamp()))" 2>/dev/null) || \
+            last_epoch=$(perl -MTime::Local -e 'print Time::Local::timegm(reverse split(/[T:-]/,substr($ARGV[0],0,19)))' "$last_failure_time" 2>/dev/null) || \
+            last_epoch=""
+        else
+            last_epoch=$(date -d "$last_failure_time" +%s 2>/dev/null) || last_epoch=""
+        fi
+        
+        if [[ -n "$last_epoch" && -n "$current_epoch" && "$current_epoch" -gt 0 ]]; then
+            hours_diff=$(( (current_epoch - last_epoch) / 3600 ))
+            
+            if [[ $hours_diff -ge $CIRCUIT_BREAKER_RESET_HOURS ]]; then
+                log_info "AD $ad 熔断器已重置（${hours_diff} 小时后）"
+                reset_ad_failures "$ad"
+                return 1
             fi
         fi
     fi
     
     log_warning "AD $ad 熔断器开启（连续 ${failure_count} 次失败）"
-    return 0  # Skip this AD
+    return 0
 }
 
 increment_ad_failure() {
@@ -113,46 +120,30 @@ increment_ad_failure() {
     local failure_data
     local updated_data
     local current_time
-    local retry_count=0
-    local max_retries=3
     
     current_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u)
     failure_data=$(get_ad_failure_data)
     
     if command -v jq >/dev/null 2>&1; then
-        # Update or add AD failure record
         updated_data=$(echo "$failure_data" | jq --arg ad "$ad" --arg time "$current_time" '
             map(if .ad == $ad then .failures += 1 | .last_failure = $time else . end) |
             if any(.ad == $ad) then . else . + [{"ad": $ad, "failures": 1, "last_failure": $time}] end |
-            .[-20:]  # Keep only last 20 AD records to prevent data size issues
+            .[-20:]
         ' 2>/dev/null)
         
         if [[ -z "$updated_data" ]]; then
-            log_warning "jq 更新失败数据失败 - 创建新记录"
+            log_debug "jq 更新失败数据失败 - 创建新记录"
             updated_data="[{\"ad\":\"$ad\",\"failures\":1,\"last_failure\":\"$current_time\"}]"
         fi
     else
-        # Fallback without jq
         updated_data="[{\"ad\":\"$ad\",\"failures\":1,\"last_failure\":\"$current_time\"}]"
     fi
     
-    # Store updated data in GitHub variables with retry logic
-    if command -v gh >/dev/null 2>&1; then
-        while [[ $retry_count -lt $max_retries ]]; do
-            if echo "$updated_data" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>/dev/null; then
-                log_debug "已更新 AD $ad 的失败数据"
-                return 0
-            else
-                retry_count=$((retry_count + 1))
-                log_warning "更新 AD 失败数据失败（第 $retry_count/$max_retries 次尝试）"
-                sleep 2
-            fi
-        done
-        
-        log_error "在 $max_retries 次尝试后仍无法持久化 AD 失败数据"
-        return 1
+    if _save_failure_data "$updated_data"; then
+        log_debug "已更新 AD $ad 的失败数据"
+        return 0
     else
-        log_debug "GitHub CLI 不可用 - 失败数据未持久化"
+        log_debug "AD 失败数据保存失败 - 不影响实例创建"
         return 0
     fi
 }
@@ -165,39 +156,25 @@ reset_ad_failures() {
     failure_data=$(get_ad_failure_data)
     
     if command -v jq >/dev/null 2>&1; then
-        # Remove AD from failure tracking
         updated_data=$(echo "$failure_data" | jq --arg ad "$ad" 'map(select(.ad != $ad))' 2>/dev/null)
         
-        if [[ -n "$updated_data" ]] && command -v gh >/dev/null 2>&1; then
-            if echo "$updated_data" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>/dev/null; then
-                log_info "已重置 AD $ad 的失败追踪"
-            else
-                log_warning "重置 AD 失败数据失败"
-            fi
+        if [[ -n "$updated_data" ]]; then
+            _save_failure_data "$updated_data"
         fi
     fi
 }
 
 reset_all_ad_failures() {
-    if command -v gh >/dev/null 2>&1; then
-        if echo "[]" | gh variable set "$AD_FAILURE_DATA_VAR" --body-file - 2>/dev/null; then
-            log_info "已重置所有 AD 失败追踪数据"
-        else
-            log_warning "重置所有 AD 失败数据失败"
-        fi
-    fi
+    _save_failure_data "[]"
 }
 
-# Get list of available ADs with circuit breaker filtering
 get_available_ads() {
-    local input_ads="$1"  # Comma-separated list of ADs
+    local input_ads="$1"
     local available_ads=""
     
-    # Convert comma-separated list to array
     IFS=',' read -ra ad_array <<< "$input_ads"
     
     for ad in "${ad_array[@]}"; do
-        # Trim whitespace
         ad=$(echo "$ad" | xargs)
         
         if should_skip_ad "$ad"; then
@@ -215,14 +192,12 @@ get_available_ads() {
     echo "$available_ads"
 }
 
-# Function to be called after successful AD usage
 mark_ad_success() {
     local ad="$1"
     log_debug "标记 AD $ad 为成功 - 重置失败追踪"
     reset_ad_failures "$ad"
 }
 
-# Show circuit breaker status for debugging
 show_circuit_breaker_status() {
     local failure_data
     local ad_count
@@ -243,7 +218,6 @@ show_circuit_breaker_status() {
     fi
 }
 
-# Export functions for use by other scripts
 export -f should_skip_ad
 export -f increment_ad_failure
 export -f mark_ad_success
