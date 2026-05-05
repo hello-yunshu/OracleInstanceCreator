@@ -360,8 +360,8 @@ launch_instance() {
     
     if [[ -z "$available_ads_string" ]]; then
         log_warning "熔断器已过滤掉所有 AD - 均有过多近期失败"
-    log_info "将在熔断器重置后重试"
-        return 0  # Treat as capacity issue - retry later
+        log_info "将在熔断器重置后重试"
+        return "$OCI_EXIT_CAPACITY_ERROR"
     fi
     
     local ad_list
@@ -477,7 +477,7 @@ launch_instance() {
                     continue
                 else
                     log_info "LimitExceeded 错误后所有 AD 已穷尽"
-                    return 0
+                    return "$OCI_EXIT_USER_LIMIT_ERROR"
                 fi
                 ;;
             "INTERNAL_ERROR"|"NETWORK")
@@ -554,7 +554,7 @@ launch_instance() {
                                 continue
                             else
                                 log_info "所有 AD 已穷尽 - 将在下次调度时重试"
-                                return 0
+                                return "$OCI_EXIT_CAPACITY_ERROR"
                             fi
                             ;;
                         "RATE_LIMIT")
@@ -699,7 +699,7 @@ handle_launch_error_with_ad() {
             ;;
         "AUTH")
             log_error "AD $current_ad 中认证/授权错误"
-            send_telegram_notification "critical" "OCI authentication error: Check credentials and permissions"
+            send_telegram_notification "critical" "OCI 认证错误: 请检查凭据和权限"
             echo "AUTH"
             return 0
             ;;
@@ -707,7 +707,7 @@ handle_launch_error_with_ad() {
             log_error "AD $current_ad 中检测到配置错误"
             local error_line
             error_line=$(echo "$error_output" | head -1)
-            send_telegram_notification "critical" "OCI configuration error: ${error_line}"
+            send_telegram_notification "critical" "OCI 配置错误: ${error_line}"
             echo "CONFIG"
             return 0
             ;;
@@ -725,7 +725,7 @@ handle_launch_error_with_ad() {
             log_error "AD $current_ad 中实例启动时发生意外错误"
             local error_line
             error_line=$(echo "$error_output" | head -1)
-            send_telegram_notification "error" "OCI instance launch failed in $current_ad: ${error_line}"
+            send_telegram_notification "error" "OCI 实例启动失败（AD $current_ad）: ${error_line}"
             echo "UNKNOWN"
             return 0
             ;;
@@ -793,7 +793,7 @@ verify_instance_creation() {
             # Record success pattern for adaptive scheduling
             record_success_pattern "VERIFIED" "1" "1"
             
-            send_telegram_notification "success" "OCI instance verified: ${INSTANCE_DISPLAY_NAME} (OCID: ${instance_id}, State: ${state})"
+            send_telegram_notification "success" "OCI 实例验证成功: ${INSTANCE_DISPLAY_NAME} (OCID: ${instance_id}, 状态: ${state})"
             return 0
         fi
         
