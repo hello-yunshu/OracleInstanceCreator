@@ -759,24 +759,37 @@ main() {
     # Log results
     if [[ $STATUS_A1 -eq 0 ]]; then
         log_success "A1.Flex (ARM) 实例创建: 成功"
+    elif [[ $STATUS_A1 -eq 2 ]]; then
+        log_info "A1.Flex (ARM) 实例创建: 容量不足（将在下次调度时重试）"
+    elif [[ $STATUS_A1 -eq 5 ]]; then
+        log_info "A1.Flex (ARM) 实例创建: 已达用户限额"
     elif [[ $STATUS_A1 -eq 124 ]]; then
         log_warning "A1.Flex (ARM) 实例创建: 超时"
-    else
+    elif [[ "$SHOULD_LAUNCH_A1" == true ]]; then
         log_warning "A1.Flex (ARM) 实例创建: 失败"
     fi
 
-    if [[ $STATUS_E2 -eq 0 ]]; then
-        log_success "E2.1.Micro (AMD) 实例创建: 成功"
-    elif [[ $STATUS_E2 -eq 124 ]]; then
-        log_warning "E2.1.Micro (AMD) 实例创建: 超时"
-    else
-        log_warning "E2.1.Micro (AMD) 实例创建: 失败"
+    if [[ "$SHOULD_LAUNCH_E2" == true ]]; then
+        if [[ $STATUS_E2 -eq 0 ]]; then
+            log_success "E2.1.Micro (AMD) 实例创建: 成功"
+        elif [[ $STATUS_E2 -eq 2 ]]; then
+            log_info "E2.1.Micro (AMD) 实例创建: 容量不足（将在下次调度时重试）"
+        elif [[ $STATUS_E2 -eq 5 ]]; then
+            log_info "E2.1.Micro (AMD) 实例创建: 已达用户限额"
+        elif [[ $STATUS_E2 -eq 124 ]]; then
+            log_warning "E2.1.Micro (AMD) 实例创建: 超时"
+        else
+            log_warning "E2.1.Micro (AMD) 实例创建: 失败"
+        fi
     fi
 
     # Determine overall result
     local success_count=0
-    [[ $STATUS_A1 -eq 0 ]] && success_count=$((success_count + 1))
-    [[ $STATUS_E2 -eq 0 ]] && success_count=$((success_count + 1))
+    local total_shapes=0
+    [[ "$SHOULD_LAUNCH_A1" == true ]] && total_shapes=$((total_shapes + 1))
+    [[ "$SHOULD_LAUNCH_E2" == true ]] && total_shapes=$((total_shapes + 1))
+    [[ $STATUS_A1 -eq 0 && "$SHOULD_LAUNCH_A1" == true ]] && success_count=$((success_count + 1))
+    [[ $STATUS_E2 -eq 0 && "$SHOULD_LAUNCH_E2" == true ]] && success_count=$((success_count + 1))
 
     # Check different types of failures for intelligent handling
     local capacity_failures=0
@@ -784,16 +797,16 @@ main() {
     local rate_limit_failures=0
     
     # Count capacity-related failures (exit code 2 = OCI_EXIT_CAPACITY_ERROR)
-    [[ $STATUS_A1 -eq 2 ]] && capacity_failures=$((capacity_failures + 1))
-    [[ $STATUS_E2 -eq 2 ]] && capacity_failures=$((capacity_failures + 1))
+    [[ $STATUS_A1 -eq 2 && "$SHOULD_LAUNCH_A1" == true ]] && capacity_failures=$((capacity_failures + 1))
+    [[ $STATUS_E2 -eq 2 && "$SHOULD_LAUNCH_E2" == true ]] && capacity_failures=$((capacity_failures + 1))
     
     # Count user limit failures (exit code 5 = OCI_EXIT_USER_LIMIT_ERROR)
-    [[ $STATUS_A1 -eq 5 ]] && user_limit_failures=$((user_limit_failures + 1))
-    [[ $STATUS_E2 -eq 5 ]] && user_limit_failures=$((user_limit_failures + 1))
+    [[ $STATUS_A1 -eq 5 && "$SHOULD_LAUNCH_A1" == true ]] && user_limit_failures=$((user_limit_failures + 1))
+    [[ $STATUS_E2 -eq 5 && "$SHOULD_LAUNCH_E2" == true ]] && user_limit_failures=$((user_limit_failures + 1))
     
     # Count rate limit failures (exit code 6 = OCI_EXIT_RATE_LIMIT_ERROR)
-    [[ $STATUS_A1 -eq 6 ]] && rate_limit_failures=$((rate_limit_failures + 1))
-    [[ $STATUS_E2 -eq 6 ]] && rate_limit_failures=$((rate_limit_failures + 1))
+    [[ $STATUS_A1 -eq 6 && "$SHOULD_LAUNCH_A1" == true ]] && rate_limit_failures=$((rate_limit_failures + 1))
+    [[ $STATUS_E2 -eq 6 && "$SHOULD_LAUNCH_E2" == true ]] && rate_limit_failures=$((rate_limit_failures + 1))
 
     log_elapsed "parallel_execution"
 
@@ -801,8 +814,8 @@ main() {
     track_resource_usage "end"
 
     # Log comprehensive execution summary
-    local performance_summary="ExecutionTime=${elapsed}s,A1Duration=${a1_duration}s,E2Duration=${e2_duration}s"
-    performance_summary="${performance_summary},PeakMemory=${peak_memory}MB,SuccessRate=${success_count}/2"
+    local performance_summary="执行时间=${elapsed}s,A1耗时=${a1_duration}s,E2耗时=${e2_duration}s"
+    performance_summary="${performance_summary},峰值内存=${peak_memory}MB,成功率=${success_count}/${total_shapes}"
     log_performance_metric "CONCURRENT_END" "parallel_execution" "$success_count" "2" "$performance_summary"
 
     # Log structured performance data for analysis
@@ -823,7 +836,7 @@ main() {
     actual_instances=$(count_actual_instances)
     
     if [[ $actual_instances -gt 0 ]]; then
-        log_success "并行执行完成: $actual_instances/2 个实例实际存在且运行中"
+        log_success "并行执行完成: $actual_instances/$total_shapes 个实例实际存在且运行中"
 
         # Instance hunting success: notify for ANY created instances with details
         if [[ "${ENABLE_NOTIFICATIONS:-}" == "true" ]]; then
@@ -878,68 +891,40 @@ $notification_details"
         fi
 
         return 0
-    elif [[ $user_limit_failures -gt 0 && $((user_limit_failures + success_count)) -eq 2 ]]; then
-        # User limits reached - this is expected behavior when at free tier limits
+    elif [[ $user_limit_failures -gt 0 && $((user_limit_failures + success_count)) -eq $total_shapes ]]; then
         log_info "$user_limit_failures 种形状已达用户限额 - 无需继续尝试"
         log_info "请考虑管理现有实例以释放新部署的容量"
-        
-        # Notification Policy: NO notifications for user limits
-        # User limits are EXPECTED free tier behavior - normal operation
-        # Per CLAUDE.md policy: "DO NOT send notifications for User limits reached (expected)"
-        
-        return 0  # User limits are not failures - they're expected behavior
-    elif [[ $rate_limit_failures -gt 0 && $((rate_limit_failures + success_count + capacity_failures + user_limit_failures)) -eq 2 ]]; then
-        # Rate limits encountered - this is expected Oracle behavior, no notifications needed
+        return 0
+    elif [[ $rate_limit_failures -gt 0 && $((rate_limit_failures + success_count + capacity_failures + user_limit_failures)) -eq $total_shapes ]]; then
         log_info "$rate_limit_failures 种形状遇到 Oracle API 速率限制 - 将在下次调度运行时重试"
         log_info "这是 Oracle API 在高使用期间的正常行为，会自动恢复"
-        
-        # Notification Policy: NO notifications for rate limits  
-        # Rate limiting is EXPECTED Oracle API behavior during high usage periods
-        # Per CLAUDE.md policy: "DO NOT send notifications for Rate limiting (standard behavior)"
-        
-        return 0  # Rate limits are not failures - they're expected behavior
-    elif [[ $capacity_failures -eq 2 ]]; then
-        # Both failed due to Oracle capacity constraints - this is expected behavior
-        log_info "两种形状因 Oracle 容量限制不可用 - 将在下次调度时重试"
+        return 0
+    elif [[ $capacity_failures -eq $total_shapes ]]; then
+        log_info "所有形状因 Oracle 容量限制不可用 - 将在下次调度时重试"
         log_info "这是 Oracle Cloud 容量暂时耗尽时的正常行为"
-
-        # Notification Policy: NO notifications for Oracle capacity constraints
-        # Capacity constraints are EXPECTED operational conditions that resolve through retry cycles
-        # Per CLAUDE.md policy: "DO NOT send notifications for Oracle capacity unavailable (expected)"
-        
-        return 0 # Don't treat capacity exhaustion as failure
-    elif [[ $((capacity_failures + user_limit_failures + rate_limit_failures)) -eq 2 ]]; then
-        # Mixed capacity, limit, and rate limit issues - still expected behavior
+        return 0
+    elif [[ $((capacity_failures + user_limit_failures + rate_limit_failures)) -eq $total_shapes ]]; then
         log_info "遇到混合 Oracle 限制 - 将在下次调度时重试"
         log_info "这是 Oracle Cloud 的正常行为 - 容量、限额或速率限制"
-        
-        # Notification Policy: NO notifications for mixed constraint scenarios
-        # These are EXPECTED Oracle operational conditions that resolve through retry cycles
-        # Per CLAUDE.md policy: \"DO NOT send notifications for\" expected operational conditions
-        
-        return 0  # Mixed constraint issues are still expected behavior
+        return 0
     else
-        # Analyze and report the specific failure reasons
         local failure_summary=""
-        if [[ $STATUS_A1 -ne 0 && $STATUS_A1 -ne 2 && $STATUS_A1 -ne 5 && $STATUS_A1 -ne 6 ]]; then
-            failure_summary="A1.Flex failed (exit: $STATUS_A1)"
+        if [[ $STATUS_A1 -ne 0 && $STATUS_A1 -ne 2 && $STATUS_A1 -ne 5 && $STATUS_A1 -ne 6 && "$SHOULD_LAUNCH_A1" == true ]]; then
+            failure_summary="A1.Flex 失败（退出码: $STATUS_A1）"
         fi
-        if [[ $STATUS_E2 -ne 0 && $STATUS_E2 -ne 2 && $STATUS_E2 -ne 5 && $STATUS_E2 -ne 6 ]]; then
+        if [[ $STATUS_E2 -ne 0 && $STATUS_E2 -ne 2 && $STATUS_E2 -ne 5 && $STATUS_E2 -ne 6 && "$SHOULD_LAUNCH_E2" == true ]]; then
             if [[ -n "$failure_summary" ]]; then
-                failure_summary="$failure_summary, E2.1.Micro failed (exit: $STATUS_E2)"
+                failure_summary="$failure_summary, E2.1.Micro 失败（退出码: $STATUS_E2）"
             else
-                failure_summary="E2.1.Micro failed (exit: $STATUS_E2)"
+                failure_summary="E2.1.Micro 失败（退出码: $STATUS_E2）"
             fi
         fi
         
         if [[ -n "$failure_summary" ]]; then
             log_error "并行执行失败: $failure_summary - 可能是配置或认证错误"
         else
-            log_error "并行执行失败: 两种实例创建尝试均失败"
+            log_error "并行执行失败: 所有实例创建尝试均失败"
         fi
-
-        # Let individual shape failures handle their own error notifications
-        # This prevents duplicate error notifications
 
         return 1
     fi
