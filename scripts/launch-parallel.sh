@@ -339,7 +339,7 @@ verify_and_update_state() {
     }
     
     # Verify A1.Flex instance state if creation was attempted
-    if [[ "$status_a1" -eq 0 ]]; then
+    if [[ "$status_a1" -eq 0 && "$SHOULD_LAUNCH_A1" == "true" ]]; then
         local a1_instance_id
         a1_instance_id=$(verify_instance_exists "${A1_FLEX_CONFIG[DISPLAY_NAME]}" "$comp_id" "${temp_dir}/a1flex_instance_id")
         
@@ -358,7 +358,7 @@ verify_and_update_state() {
     fi
     
     # Verify E2.Micro instance state if creation was attempted
-    if [[ "$status_e2" -eq 0 ]]; then
+    if [[ "$status_e2" -eq 0 && "$SHOULD_LAUNCH_E2" == "true" ]]; then
         local e2_instance_id
         e2_instance_id=$(verify_instance_exists "${E2_MICRO_CONFIG[DISPLAY_NAME]}" "$comp_id" "${temp_dir}/e21micro_instance_id")
         
@@ -846,19 +846,21 @@ main() {
                 fi
             fi
             
-            # Get details for E2.Micro if it exists
-            local e2_instance_id
-            if [[ -n "$comp_id" ]] && e2_instance_id=$(oci_cmd compute instance list \
-                --compartment-id "$comp_id" \
-                --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
-                --limit 1 \
-                --query 'data[0].id' \
-                --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
-                shapes_created="${shapes_created:+$shapes_created, }E2.1.Micro (AMD)"
-                if e2_details=$(get_instance_details "$e2_instance_id" "E2.1.Micro (AMD)" 2>/dev/null); then
-                    notification_details="${notification_details:+$notification_details
+            # Get details for E2.Micro if it exists and was not skipped
+            if [[ "$SHOULD_LAUNCH_E2" == "true" ]]; then
+                local e2_instance_id
+                if [[ -n "$comp_id" ]] && e2_instance_id=$(oci_cmd compute instance list \
+                    --compartment-id "$comp_id" \
+                    --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
+                    --limit 1 \
+                    --query 'data[0].id' \
+                    --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
+                    shapes_created="${shapes_created:+$shapes_created, }E2.1.Micro (AMD)"
+                    if e2_details=$(get_instance_details "$e2_instance_id" "E2.1.Micro (AMD)" 2>/dev/null); then
+                        notification_details="${notification_details:+$notification_details
 
 }$e2_details"
+                    fi
                 fi
             fi
             
