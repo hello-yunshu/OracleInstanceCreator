@@ -11,8 +11,6 @@ source "$(dirname "$0")/metrics.sh"
 source "$(dirname "$0")/circuit-breaker.sh"
 source "$(dirname "$0")/state-manager.sh"
 
-readonly ACTIVE_LIFECYCLE_STATES=(--lifecycle-state MOVING --lifecycle-state PROVISIONING --lifecycle-state RUNNING --lifecycle-state STARTING --lifecycle-state STOPPING --lifecycle-state STOPPED --lifecycle-state CREATING_IMAGE)
-
 # Global flag for signal handling
 INTERRUPTED=false
 
@@ -70,20 +68,6 @@ interruptible_sleep() {
 # Ensure proxy configuration is applied if needed (fallback)
 # Note: Proxy should already be configured by setup-oci.sh, but this ensures it's available
 parse_and_configure_proxy false
-
-determine_compartment() {
-    local comp_id
-    
-    if [[ -z "${OCI_COMPARTMENT_ID:-}" ]]; then
-        comp_id="$OCI_TENANCY_OCID"
-        log_info "使用租户 OCID 作为区间"
-    else
-        comp_id="$OCI_COMPARTMENT_ID"
-        log_info "使用指定区间"
-    fi
-    
-    echo "$comp_id"
-}
 
 lookup_image_id() {
     local comp_id="$1"
@@ -893,11 +877,11 @@ launch_oci_instance() {
     
     log_elapsed "total_execution"
     
-    return $launch_result
+    return "$launch_result"
 }
 
 # Run launch if called directly
 if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
     launch_oci_instance
-    exit $?
+    exit "$?"
 fi

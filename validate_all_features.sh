@@ -3,7 +3,7 @@
 # Comprehensive validation script to demonstrate all proxy improvements
 # This script validates that all the issues from the PR review have been addressed
 
-set +euo pipefail  # Relaxed mode for demonstration
+set -uo pipefail
 
 echo "========================================"
 echo "Proxy Implementation Validation Script"

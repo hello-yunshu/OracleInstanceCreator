@@ -85,6 +85,7 @@ send_telegram_notification() {
     
     local response
     local status
+    local masked_token="${TELEGRAM_TOKEN:0:8}...${TELEGRAM_TOKEN: -4}"
     
     set +e
     response=$(curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
@@ -98,12 +99,13 @@ send_telegram_notification() {
     
     if [[ $status -eq 0 ]]; then
         if echo "$response" | grep -q '"ok":true'; then
-            log_debug "Telegram 通知发送成功"
+            log_debug "Telegram 通知发送成功 (token: $masked_token)"
         else
-            log_warning "Telegram API 返回错误: $response"
+            log_warning "Telegram API 返回错误 (token: $masked_token)"
+            log_debug "API 响应详情: $response"
         fi
     else
-        log_warning "Telegram 通知发送失败 (curl 退出码: $status)"
+        log_warning "Telegram 通知发送失败 (curl 退出码: $status, token: $masked_token)"
         log_debug "Curl 错误: $response"
     fi
 }

@@ -96,6 +96,10 @@ readonly STATE_FILE_NAME="instance-state.json"
 readonly CACHE_KEY_PREFIX="oci-instances"
 readonly CACHE_PATH_DEFAULT=".cache/oci-state"
 
+readonly CACHE_STATS_FILE="cache-stats.json"
+
+readonly ACTIVE_LIFECYCLE_STATES=(--lifecycle-state MOVING --lifecycle-state PROVISIONING --lifecycle-state RUNNING --lifecycle-state STARTING --lifecycle-state STOPPING --lifecycle-state STOPPED --lifecycle-state CREATING_IMAGE)
+
 readonly HIGH_CONTENTION_REGIONS="ap-singapore-1,us-ashburn-1,us-phoenix-1,eu-frankfurt-1"
 readonly HIGH_CONTENTION_TTL_MULTIPLIER="0.5"
 
@@ -145,7 +149,7 @@ validate_constants() {
         ((errors++))
     fi
 
-    return $errors
+    return "$errors"
 }
 
 if ! validate_constants; then

@@ -32,8 +32,11 @@ INSTANCE_VERIFY_DELAY: "30"
 LOG_FORMAT: "text"               # or "json" for structured logging
 
 # AMD Image Cache (Update periodically)
+# WARNING: The image OCID below is for ap-singapore-1 and will NOT work in us-ashburn-1!
+# You MUST update this to a us-ashburn-1 image OCID before use.
 # Check latest AMD images: oci compute image list --compartment-id <tenancy-ocid> --operating-system "Oracle Linux" --operating-system-version "10" --shape "VM.Standard.E2.1.Micro" --sort-by TIMECREATED --sort-order DESC
-OCI_CACHED_OL10_AMD_IMAGE: "ocid1.image.oc1.ap-singapore-1.aaaaaaaaitll52n3sr73g2gaclby2ph5whrmb5l3tbo47i6atle6z3cemr6a"
+# Or leave empty to auto-detect: OCI_CACHED_OL10_AMD_IMAGE: ""
+OCI_CACHED_OL10_AMD_IMAGE: ""
 
 # Required GitHub Secrets (not environment variables):
 # OCI_USER_OCID: Your OCI user OCID

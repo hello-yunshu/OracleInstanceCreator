@@ -99,8 +99,6 @@ cleanup_handler() {
 # Set up signal handlers
 trap cleanup_handler SIGTERM SIGINT
 
-ACTIVE_LIFECYCLE_STATES=(--lifecycle-state MOVING --lifecycle-state PROVISIONING --lifecycle-state RUNNING --lifecycle-state STARTING --lifecycle-state STOPPING --lifecycle-state STOPPED --lifecycle-state CREATING_IMAGE)
-
 get_region_suffix() {
     local region="${OCI_REGION:-}"
     case "$region" in
@@ -151,22 +149,6 @@ declare -A E2_MICRO_CONFIG=(
     ["DISPLAY_NAME"]="e2-micro-${REGION_SUFFIX}"
     ["BOOT_VOLUME_ID"]="${E2_BOOT_VOLUME_ID:-${BOOT_VOLUME_ID:-}}"
 )
-
-determine_compartment() {
-    local comp_id
-
-    if [[ -z "${OCI_COMPARTMENT_ID:-}" ]]; then
-        comp_id="${OCI_TENANCY_OCID:-}"
-        if [[ -n "$comp_id" ]]; then
-            log_info "使用租户 OCID 作为区间"
-        fi
-    else
-        comp_id="$OCI_COMPARTMENT_ID"
-        log_info "使用指定区间"
-    fi
-
-    echo "$comp_id"
-}
 
 # Verify actual instance existence by querying OCI API
 count_actual_instances() {
@@ -254,7 +236,66 @@ launch_shape() {
         echo "$duration" >"${temp_dir}/${shape_name,,}_duration" 2>/dev/null || true
     fi
 
-    return $exit_code
+    return "$exit_code"
+}
+
+verify_instance_exists() {
+    local display_name="$1"
+    local comp_id="$2"
+    local instance_id_file="${3:-}"
+    local max_retries=5
+    local retry_delay=5
+    
+    if [[ -n "$instance_id_file" && -f "$instance_id_file" ]]; then
+        local ocid
+        ocid=$(cat "$instance_id_file" 2>/dev/null || echo "")
+        if [[ -n "$ocid" && "$ocid" != "null" ]]; then
+            log_debug "使用 OCID 直接查询实例: ${ocid:0:30}..."
+            for i in $(seq 1 $max_retries); do
+                local state
+                state=$(oci_cmd compute instance get \
+                    --instance-id "$ocid" \
+                    --query 'data."lifecycle-state"' \
+                    --raw-output 2>/dev/null || echo "")
+                
+                if [[ -n "$state" && "$state" != "null" ]]; then
+                    log_debug "通过 OCID 找到实例（状态: $state）"
+                    echo "$ocid"
+                    return 0
+                fi
+                
+                if [[ $i -lt $max_retries ]]; then
+                    log_debug "OCID 查询未返回状态，${retry_delay}s 后重试 ($i/$max_retries)..."
+                    sleep "$retry_delay"
+                fi
+            done
+            log_debug "OCID 直接查询失败，回退到 display-name 搜索"
+        fi
+    fi
+    
+    local instance_id=""
+    for i in $(seq 1 $max_retries); do
+        instance_id=$(oci_cmd compute instance list \
+            --compartment-id "$comp_id" \
+            --display-name "$display_name" \
+            "${ACTIVE_LIFECYCLE_STATES[@]}" \
+            --limit 1 \
+            --query 'data[0].id' \
+            --raw-output 2>/dev/null || echo "")
+        
+        if [[ -n "$instance_id" && "$instance_id" != "null" ]]; then
+            echo "$instance_id"
+            return 0
+        fi
+        
+        if [[ $i -lt $max_retries ]]; then
+            log_debug "实例 '$display_name' 未找到，${retry_delay}s 后重试 ($i/$max_retries)..."
+            sleep "$retry_delay"
+        fi
+    done
+    
+    echo ""
+    return 1
 }
 
 # Verify instance states and update cache after parallel execution
@@ -277,67 +318,6 @@ verify_and_update_state() {
         log_error "OCI_COMPARTMENT_ID 和 OCI_TENANCY_OCID 均不可用 - 无法验证实例状态"
         return 2
     fi
-    
-    verify_instance_exists() {
-        local display_name="$1"
-        local comp_id="$2"
-        local instance_id_file="${3:-}"
-        local max_retries=5
-        local retry_delay=5
-        
-        # 优先使用 OCID 直接查询（比 display-name 搜索更可靠）
-        if [[ -n "$instance_id_file" && -f "$instance_id_file" ]]; then
-            local ocid
-            ocid=$(cat "$instance_id_file" 2>/dev/null || echo "")
-            if [[ -n "$ocid" && "$ocid" != "null" ]]; then
-                log_debug "使用 OCID 直接查询实例: ${ocid:0:30}..."
-                for i in $(seq 1 $max_retries); do
-                    local state
-                    state=$(oci_cmd compute instance get \
-                        --instance-id "$ocid" \
-                        --query 'data."lifecycle-state"' \
-                        --raw-output 2>/dev/null || echo "")
-                    
-                    if [[ -n "$state" && "$state" != "null" ]]; then
-                        log_debug "通过 OCID 找到实例（状态: $state）"
-                        echo "$ocid"
-                        return 0
-                    fi
-                    
-                    if [[ $i -lt $max_retries ]]; then
-                        log_debug "OCID 查询未返回状态，${retry_delay}s 后重试 ($i/$max_retries)..."
-                        sleep $retry_delay
-                    fi
-                done
-                log_debug "OCID 直接查询失败，回退到 display-name 搜索"
-            fi
-        fi
-        
-        # 回退：使用 display-name 搜索
-        local instance_id=""
-        for i in $(seq 1 $max_retries); do
-            instance_id=$(oci_cmd compute instance list \
-                --compartment-id "$comp_id" \
-                --display-name "$display_name" \
-                "${ACTIVE_LIFECYCLE_STATES[@]}" \
-                --limit 1 \
-                --query 'data[0].id' \
-                --raw-output 2>/dev/null || echo "")
-            
-            if [[ -n "$instance_id" && "$instance_id" != "null" ]]; then
-                echo "$instance_id"
-                return 0
-            fi
-            
-            if [[ $i -lt $max_retries ]]; then
-                log_debug "实例 '$display_name' 未找到，${retry_delay}s 后重试 ($i/$max_retries)..."
-                sleep $retry_delay
-            fi
-        done
-        
-        echo ""
-        return 1
-    }
     
     # Verify A1.Flex instance state if creation was attempted
     if [[ "$status_a1" -eq 0 && "$SHOULD_LAUNCH_A1" == "true" ]]; then
@@ -542,7 +522,7 @@ main() {
             log_debug "A1.Flex 后台进程写入退出码 $exit_code 到结果文件"
             # Small delay to ensure file system flush
             sleep 0.1
-            exit $exit_code
+            exit "$exit_code"
         ) &
         PID_A1=$!
         log_debug "A1.Flex 后台进程已启动，PID: $PID_A1"
@@ -571,7 +551,7 @@ main() {
             log_debug "E2.1.Micro 后台进程写入退出码 $exit_code 到结果文件"
             # Small delay to ensure file system flush
             sleep 0.1
-            exit $exit_code
+            exit "$exit_code"
         ) &
         PID_E2=$!
         log_debug "E2.1.Micro 后台进程已启动，PID: $PID_E2"
@@ -618,7 +598,7 @@ main() {
             track_resource_usage "peak"
         fi
 
-        sleep $sleep_interval
+        sleep "$sleep_interval"
         ((elapsed += sleep_interval))
     done
 
@@ -628,12 +608,12 @@ main() {
     
     if [[ -n "$PID_A1" ]]; then
         log_debug "等待 A1.Flex 进程 (PID: $PID_A1) 完成"
-        wait $PID_A1 2>/dev/null || a1_wait_result=$?
+        wait "$PID_A1" 2>/dev/null || a1_wait_result=$?
         log_debug "A1.Flex 进程等待完成，结果: $a1_wait_result"
     fi
     if [[ -n "$PID_E2" ]]; then
         log_debug "等待 E2.1.Micro 进程 (PID: $PID_E2) 完成"
-        wait $PID_E2 2>/dev/null || e2_wait_result=$?
+        wait "$PID_E2" 2>/dev/null || e2_wait_result=$?
         log_debug "E2.1.Micro 进程等待完成，结果: $e2_wait_result"
     fi
 
@@ -641,7 +621,9 @@ main() {
     sleep 0.2
 
     # Wait for result files with proper timeout (fixes race condition)
-    if wait_for_result_file "$a1_result"; then
+    # Use timeout aligned with parallel execution timeout to avoid premature timeout
+    local result_wait_timeout=$((GITHUB_ACTIONS_BILLING_TIMEOUT + 5))
+    if wait_for_result_file "$a1_result" "$result_wait_timeout"; then
         STATUS_A1=$(cat "$a1_result" 2>/dev/null || echo "1")
         log_debug "A1 结果文件已找到，状态: $STATUS_A1"
         # Validate the status is numeric
@@ -654,7 +636,7 @@ main() {
         STATUS_A1=${a1_wait_result:-1}
     fi
 
-    if wait_for_result_file "$e2_result"; then
+    if wait_for_result_file "$e2_result" "$result_wait_timeout"; then
         STATUS_E2=$(cat "$e2_result" 2>/dev/null || echo "1")
         log_debug "E2 结果文件已找到，状态: $STATUS_E2"
         # Validate the status is numeric
@@ -949,5 +931,5 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     fi
     
     # Exit with the captured code to preserve correct workflow behavior
-    exit $main_exit_code
+    exit "$main_exit_code"
 fi

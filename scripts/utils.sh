@@ -249,7 +249,7 @@ oci_cmd_data() {
         log_error "输出: $output"
         log_error "错误详情: $(head -5 "$stderr_out" 2>/dev/null)"
         rm -f "$stderr_out"
-        return $status
+        return "$status"
     fi
     
     rm -f "$stderr_out"
@@ -363,7 +363,7 @@ oci_cmd_debug() {
     fi
     
     echo "$output"
-    return $status
+    return "$status"
 }
 
 # Intelligent OCI CLI command wrapper - uses appropriate mode
@@ -704,22 +704,22 @@ get_exit_code_for_error_type() {
     
     case "$error_type" in
         "CAPACITY"|"LIMIT_EXCEEDED")
-            echo $OCI_EXIT_CAPACITY_ERROR
+            echo "$OCI_EXIT_CAPACITY_ERROR"
             ;;
         "RATE_LIMIT")
-            echo $OCI_EXIT_RATE_LIMIT_ERROR
+            echo "$OCI_EXIT_RATE_LIMIT_ERROR"
             ;;
         "AUTH"|"CONFIG"|"DUPLICATE")
-            echo $OCI_EXIT_CONFIG_ERROR
+            echo "$OCI_EXIT_CONFIG_ERROR"
             ;;
         "NETWORK"|"INTERNAL_ERROR")
-            echo $OCI_EXIT_NETWORK_ERROR
+            echo "$OCI_EXIT_NETWORK_ERROR"
             ;;
         "TIMEOUT")
-            echo $OCI_EXIT_TIMEOUT
+            echo "$OCI_EXIT_TIMEOUT"
             ;;
         *)
-            echo $OCI_EXIT_GENERAL_ERROR
+            echo "$OCI_EXIT_GENERAL_ERROR"
             ;;
     esac
 }
@@ -866,6 +866,22 @@ is_valid_ocid() {
     else
         return 1
     fi
+}
+
+determine_compartment() {
+    local comp_id
+
+    if [[ -z "${OCI_COMPARTMENT_ID:-}" ]]; then
+        comp_id="${OCI_TENANCY_OCID:-}"
+        if [[ -n "$comp_id" ]]; then
+            log_info "使用租户 OCID 作为区间"
+        fi
+    else
+        comp_id="$OCI_COMPARTMENT_ID"
+        log_info "使用指定区间"
+    fi
+
+    echo "$comp_id"
 }
 
 # Validate configuration values don't contain spaces

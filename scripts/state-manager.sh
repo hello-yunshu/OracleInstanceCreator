@@ -100,20 +100,19 @@ get_state_file_path() {
 acquire_state_lock() {
     local state_file="$1"
     local lock_file="${state_file}.lock"
-    local timeout="${2:-30}"  # Default 30 second timeout
+    local timeout="${2:-30}"
     local wait_count=0
     
-    # Try to acquire lock with timeout
     while (( wait_count < timeout )); do
         if (set -C; echo $$ > "$lock_file") 2>/dev/null; then
             log_debug "已获取状态锁: $lock_file"
             return 0
         fi
         
-        # Check if lock is stale (older than 5 minutes)
         if [[ -f "$lock_file" ]] && [[ $(( $(date +%s) - $(stat -c %Y "$lock_file" 2>/dev/null || stat -f %m "$lock_file" 2>/dev/null || echo 0) )) -gt 300 ]]; then
             log_warning "正在移除过期锁文件: $lock_file"
             rm -f "$lock_file"
+            sleep 0.1
             continue
         fi
         
@@ -151,7 +150,7 @@ with_state_lock() {
         local result=$?
         release_state_lock "$state_file"
         trap - EXIT ERR
-        return $result
+        return "$result"
     else
         log_error "状态操作获取锁失败: $func_name"
         return 1

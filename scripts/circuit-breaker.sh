@@ -1,7 +1,6 @@
 #!/bin/bash
 
 source "$(dirname "$0")/utils.sh"
-source "$(dirname "$0")/constants.sh"
 
 readonly MAX_CONSECUTIVE_FAILURES=3
 readonly CIRCUIT_BREAKER_RESET_HOURS=24
