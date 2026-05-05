@@ -319,6 +319,7 @@ verify_and_update_state() {
             instance_id=$(oci_cmd compute instance list \
                 --compartment-id "$comp_id" \
                 --display-name "$display_name" \
+                "${ACTIVE_LIFECYCLE_STATES[@]}" \
                 --limit 1 \
                 --query 'data[0].id' \
                 --raw-output 2>/dev/null || echo "")
@@ -837,6 +838,7 @@ main() {
             if [[ -n "$comp_id" ]] && a1_instance_id=$(oci_cmd compute instance list \
                 --compartment-id "$comp_id" \
                 --display-name "${A1_FLEX_CONFIG[DISPLAY_NAME]}" \
+                "${ACTIVE_LIFECYCLE_STATES[@]}" \
                 --limit 1 \
                 --query 'data[0].id' \
                 --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
@@ -852,6 +854,7 @@ main() {
                 if [[ -n "$comp_id" ]] && e2_instance_id=$(oci_cmd compute instance list \
                     --compartment-id "$comp_id" \
                     --display-name "${E2_MICRO_CONFIG[DISPLAY_NAME]}" \
+                    "${ACTIVE_LIFECYCLE_STATES[@]}" \
                     --limit 1 \
                     --query 'data[0].id' \
                     --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then

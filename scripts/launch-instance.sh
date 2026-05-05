@@ -11,6 +11,8 @@ source "$(dirname "$0")/metrics.sh"
 source "$(dirname "$0")/circuit-breaker.sh"
 source "$(dirname "$0")/state-manager.sh"
 
+readonly ACTIVE_LIFECYCLE_STATES=(--lifecycle-state MOVING --lifecycle-state PROVISIONING --lifecycle-state RUNNING --lifecycle-state STARTING --lifecycle-state STOPPING --lifecycle-state STOPPED --lifecycle-state CREATING_IMAGE)
+
 # Global flag for signal handling
 INTERRUPTED=false
 
@@ -152,6 +154,7 @@ check_existing_instance() {
     existing_id=$(oci_cmd compute instance list \
         --compartment-id "$comp_id" \
         --display-name "$INSTANCE_DISPLAY_NAME" \
+        "${ACTIVE_LIFECYCLE_STATES[@]}" \
         --limit 1 \
         --query 'data[0].id' \
         --raw-output)
@@ -768,6 +771,7 @@ verify_instance_creation() {
         instance_id=$(oci_cmd compute instance list \
             --compartment-id "$comp_id" \
             --display-name "$INSTANCE_DISPLAY_NAME" \
+            "${ACTIVE_LIFECYCLE_STATES[@]}" \
             --limit 1 \
             --query 'data[0].id' \
             --raw-output || echo "")
