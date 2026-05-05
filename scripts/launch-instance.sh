@@ -880,16 +880,20 @@ launch_oci_instance() {
     fi
 
     start_timer "instance_launch"
-    launch_instance "$comp_id" "$image_id"
+    local launch_result=0
+    launch_instance "$comp_id" "$image_id" || launch_result=$?
     log_elapsed "instance_launch"
     
     # Show AD performance metrics
     show_ad_metrics
     
     log_elapsed "total_execution"
+    
+    return $launch_result
 }
 
 # Run launch if called directly
 if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
     launch_oci_instance
+    exit $?
 fi
