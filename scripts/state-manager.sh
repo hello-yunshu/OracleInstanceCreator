@@ -109,11 +109,19 @@ acquire_state_lock() {
             return 0
         fi
         
-        if [[ -f "$lock_file" ]] && [[ $(( $(date +%s) - $(stat -c %Y "$lock_file" 2>/dev/null || stat -f %m "$lock_file" 2>/dev/null || echo 0) )) -gt 300 ]]; then
-            log_warning "正在移除过期锁文件: $lock_file"
-            rm -f "$lock_file"
-            sleep 0.1
-            continue
+        if [[ -f "$lock_file" ]]; then
+            local lock_mtime=0
+            if [[ "$(uname)" == "Darwin" ]]; then
+                lock_mtime=$(stat -f %m "$lock_file" 2>/dev/null || echo "0")
+            else
+                lock_mtime=$(stat -c %Y "$lock_file" 2>/dev/null || echo "0")
+            fi
+            if [[ "$lock_mtime" =~ ^[0-9]+$ ]] && [[ $(( $(date +%s) - lock_mtime )) -gt 300 ]]; then
+                log_warning "正在移除过期锁文件: $lock_file"
+                rm -f "$lock_file"
+                sleep 0.1
+                continue
+            fi
         fi
         
         log_debug "等待状态锁... ($((wait_count + 1))/$timeout)"

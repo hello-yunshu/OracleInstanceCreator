@@ -65,10 +65,6 @@ interruptible_sleep() {
     fi
 }
 
-# Ensure proxy configuration is applied if needed (fallback)
-# Note: Proxy should already be configured by setup-oci.sh, but this ensures it's available
-parse_and_configure_proxy false
-
 lookup_image_id() {
     local comp_id="$1"
     local image_id
@@ -798,7 +794,8 @@ launch_oci_instance() {
     start_timer "total_execution"
     log_info "开始 OCI 实例启动流程，形状: ${OCI_SHAPE:-<未设置>}"
     
-    # Initialize AD metrics tracking
+    parse_and_configure_proxy false
+    
     init_metrics
     
     # Check OCI CLI availability

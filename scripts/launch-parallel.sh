@@ -705,11 +705,11 @@ main() {
     fi
     # Collect shape-specific durations for analysis (before cleanup)
     local a1_duration=0 e2_duration=0 peak_memory=0
-    if [[ -n "${temp_dir:-}" && -f "${temp_dir}/a1.flex_duration" ]]; then
-        a1_duration=$(cat "${temp_dir}/a1.flex_duration" 2>/dev/null || echo "0")
+    if [[ -n "${temp_dir:-}" && -f "${temp_dir}/a1flex_duration" ]]; then
+        a1_duration=$(cat "${temp_dir}/a1flex_duration" 2>/dev/null || echo "0")
     fi
-    if [[ -n "${temp_dir:-}" && -f "${temp_dir}/e2.1.micro_duration" ]]; then
-        e2_duration=$(cat "${temp_dir}/e2.1.micro_duration" 2>/dev/null || echo "0")
+    if [[ -n "${temp_dir:-}" && -f "${temp_dir}/e21micro_duration" ]]; then
+        e2_duration=$(cat "${temp_dir}/e21micro_duration" 2>/dev/null || echo "0")
     fi
     if [[ -n "${temp_dir:-}" && -f "${temp_dir}/peak_memory_usage" ]]; then
         peak_memory=$(cat "${temp_dir}/peak_memory_usage" 2>/dev/null || echo "0")

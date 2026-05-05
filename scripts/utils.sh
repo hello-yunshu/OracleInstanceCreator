@@ -576,10 +576,13 @@ calculate_exponential_backoff() {
     local base_delay="${2:-5}"
     local max_delay="${3:-40}"
     
-    # Calculate 2^(attempt-1) * base_delay
+    if [[ $attempt -gt 20 ]]; then
+        echo "$max_delay"
+        return
+    fi
+    
     local delay=$((base_delay * (2 ** (attempt - 1))))
     
-    # Cap at maximum delay
     if [[ $delay -gt $max_delay ]]; then
         delay=$max_delay
     fi

@@ -99,7 +99,7 @@ should_skip_ad() {
             last_epoch=$(date -d "$last_failure_time" +%s 2>/dev/null) || last_epoch=""
         fi
         
-        if [[ -n "$last_epoch" && -n "$current_epoch" && "$current_epoch" -gt 0 ]]; then
+        if [[ -n "$last_epoch" && "$last_epoch" =~ ^[0-9]+$ && -n "$current_epoch" && "$current_epoch" -gt 0 ]]; then
             hours_diff=$(( (current_epoch - last_epoch) / 3600 ))
             
             if [[ $hours_diff -ge $CIRCUIT_BREAKER_RESET_HOURS ]]; then

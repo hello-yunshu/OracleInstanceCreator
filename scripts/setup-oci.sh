@@ -33,10 +33,12 @@ EOL
     chmod 600 ~/.oci/config
     log_info "OCI 配置文件已创建"
     
+    local old_umask
+    old_umask=$(umask)
     umask 077
     printf '%s\n' "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
     chmod 600 ~/.oci/oci_api_key.pem
-    umask 022
+    umask "$old_umask"
     log_info "OCI 私钥文件已创建"
     
     log_success "OCI 配置完成"

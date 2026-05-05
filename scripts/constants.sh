@@ -135,7 +135,7 @@ validate_constants() {
     fi
 
     if [[ "$OCI_CONNECTION_TIMEOUT_SECONDS" -ge "$OCI_READ_TIMEOUT_SECONDS" ]]; then
-        echo "错误: OCI_CONNECTION_TIMEOUT_SECONDS 应小于 OCI_READ_TIMEOUT_SECONDS" >&2
+        echo "警告: OCI_CONNECTION_TIMEOUT_SECONDS 建议小于 OCI_READ_TIMEOUT_SECONDS" >&2
         ((errors++))
     fi
 

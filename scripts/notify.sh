@@ -85,7 +85,7 @@ send_telegram_notification() {
     
     local response
     local status
-    local masked_token="${TELEGRAM_TOKEN:0:8}...${TELEGRAM_TOKEN: -4}"
+    local masked_token="${TELEGRAM_TOKEN:0:4}...${TELEGRAM_TOKEN: -4}"
     
     set +e
     response=$(curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
