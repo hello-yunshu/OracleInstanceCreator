@@ -506,11 +506,10 @@ main() {
     if [[ "$SHOULD_LAUNCH_A1" == true ]]; then
         log_info "正在后台启动 A1.Flex (ARM) 实例..."
         (
-            # Capture both exit code and any error output
             set -o pipefail
             local exit_code=0
-            if ! launch_shape "A1.Flex" A1_FLEX_CONFIG; then
-                exit_code=$?
+            launch_shape "A1.Flex" A1_FLEX_CONFIG || exit_code=$?
+            if [[ $exit_code -ne 0 ]]; then
                 log_debug "A1.Flex launch_shape 返回退出码: $exit_code"
             fi
             
@@ -535,11 +534,10 @@ main() {
     if [[ "$SHOULD_LAUNCH_E2" == true ]]; then
         log_info "正在后台启动 E2.1.Micro (AMD) 实例..."
         (
-            # Capture both exit code and any error output
             set -o pipefail
             local exit_code=0
-            if ! launch_shape "E2.1.Micro" E2_MICRO_CONFIG; then
-                exit_code=$?
+            launch_shape "E2.1.Micro" E2_MICRO_CONFIG || exit_code=$?
+            if [[ $exit_code -ne 0 ]]; then
                 log_debug "E2.1.Micro launch_shape 返回退出码: $exit_code"
             fi
             
