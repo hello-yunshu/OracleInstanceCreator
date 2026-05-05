@@ -3,7 +3,7 @@
 
 # Region and Availability Domain
 OCI_REGION: "us-ashburn-1"
-OCI_AD: "ZGqs:US-ASHBURN-AD-1,ZGqs:US-ASHBURN-AD-2,ZGqs:US-ASHBURN-AD-3"
+OCI_AD: "ZGqs:US-ASHBURN-1-AD-1,ZGqs:US-ASHBURN-1-AD-2,ZGqs:US-ASHBURN-1-AD-3"
 
 # Instance Configuration
 OCI_SHAPE: "VM.Standard.E2.1.Micro"

@@ -142,8 +142,9 @@ cleanup_metrics() {
     fi
 }
 
-# Trap to ensure cleanup on exit
-trap cleanup_metrics EXIT
+if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
+    trap cleanup_metrics EXIT
+fi
 
 # Record structured performance metrics
 record_performance_metric() {

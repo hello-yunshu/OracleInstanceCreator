@@ -545,7 +545,7 @@ get_error_type() {
         log_debug "检测到 DUPLICATE 错误模式: $error_output"
         echo "DUPLICATE"
     # Check for authentication/authorization errors
-    elif echo "$error_output" | grep -qi "authentication\|authorization\|unauthorized\|forbidden\|401\|403"; then
+    elif echo "$error_output" | grep -qi "authentication\|authorization\|unauthorized\|NotAuthenticated\|\"code\".*\"NotAuthenticated\"\|\"code\".*\"NotAuthorized\""; then
         log_debug "检测到 AUTH 错误模式: $error_output"
         echo "AUTH"
     # Check for network/connectivity errors

@@ -143,13 +143,15 @@ with_state_lock() {
     shift
     
     if acquire_state_lock "$state_file"; then
-        # Ensure lock is released even if function fails
-        # shellcheck disable=SC2064
+        local old_exit_trap old_err_trap
+        old_exit_trap=$(trap -p EXIT)
+        old_err_trap=$(trap -p ERR)
         trap "release_state_lock '$state_file'" EXIT ERR
         "$func_name" "$state_file" "$@"
         local result=$?
         release_state_lock "$state_file"
-        trap - EXIT ERR
+        eval "$old_exit_trap" 2>/dev/null || true
+        eval "$old_err_trap" 2>/dev/null || true
         return "$result"
     else
         log_error "状态操作获取锁失败: $func_name"

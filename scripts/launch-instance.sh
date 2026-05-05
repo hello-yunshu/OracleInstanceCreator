@@ -163,10 +163,8 @@ handle_launch_success() {
     if [[ -z "$instance_id" ]]; then
         if [[ "$is_retry" == "true" ]]; then
             log_error "无法从重试输出中提取实例 OCID"
-            log_debug "原始重试输出: $output"
         else
             log_error "无法从输出中提取实例 OCID"
-            log_debug "原始输出: $output"
         fi
         return 1
     fi
@@ -386,7 +384,7 @@ launch_instance() {
         status=$?
         set -e
         
-        echo "$output"
+        log_debug "OCI 命令输出: $output"
         
         if [[ $status -eq 0 ]]; then
             local instance_id
@@ -404,9 +402,8 @@ launch_instance() {
         
         case "$error_type" in
             "USER_LIMIT_REACHED")
-                # User has reached free tier limits - this is expected behavior, not an error
                 log_info "形状 ${OCI_SHAPE:-unknown} 已达用户限额 - 无需继续尝试"
-            log_info "免费层限额已达。请考虑管理现有实例以释放容量。"
+                log_info "免费层限额已达。请考虑管理现有实例以释放容量。"
                 
                 # This is a terminal condition - no point trying other ADs for user limits
                 log_performance_metric "USER_LIMIT_REACHED" "${OCI_SHAPE:-unknown}" "$((ad_index + 1))" "$max_attempts" "TERMINAL"
@@ -436,9 +433,8 @@ launch_instance() {
                 fi
                 ;;
             "RATE_LIMIT")
-                # Rate limit detected - this is expected Oracle behavior
                 log_info "在 AD $current_ad 中检测到形状 ${OCI_SHAPE:-unknown} 的速率限制（第 $((ad_index + 1))/$max_attempts 次尝试）"
-            log_info "这是 Oracle API 的正常行为 - 将在下次调度的工作流运行中重试"
+                log_info "这是 Oracle API 的正常行为 - 将在下次调度的工作流运行中重试"
                 
                 # No tracking as failure - this is expected operational behavior
                 log_performance_metric "RATE_LIMIT_DETECTED" "$current_ad" "$((ad_index + 1))" "$max_attempts" "EXPECTED"

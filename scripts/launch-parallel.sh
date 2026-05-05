@@ -233,7 +233,9 @@ launch_shape() {
 
     # Store duration for analysis (write to temp file if available)
     if [[ -n "${temp_dir:-}" ]]; then
-        echo "$duration" >"${temp_dir}/${shape_name,,}_duration" 2>/dev/null || true
+        local shape_key_lower
+        shape_key_lower=$(echo "$shape_name" | tr '[:upper:]' '[:lower:]' | tr -d '.')
+        echo "$duration" >"${temp_dir}/${shape_key_lower}_duration" 2>/dev/null || true
     fi
 
     return "$exit_code"
@@ -305,11 +307,7 @@ verify_and_update_state() {
     local state_file="instance-state.json"
     local verification_errors=0
     
-    # Initialize state manager if not already done
-    if ! init_state_manager "$state_file" >/dev/null; then
-        log_error "状态管理器初始化失败"
-        return 1
-    fi
+    init_state_manager "$state_file" >/dev/null
     
     # Get the compartment ID for OCI API calls
     local comp_id
@@ -470,10 +468,8 @@ main() {
         done
     fi
     
-    # Initialize state manager to ensure state file exists
-    if ! init_state_manager "$state_file" >/dev/null; then
-        log_warning "状态管理器初始化失败，继续尝试所有形状"
-    else
+    init_state_manager "$state_file" >/dev/null
+    if [[ $? -eq 0 ]]; then
         # Check A1.Flex limit state
         if get_cached_limit_state "${A1_FLEX_CONFIG[SHAPE]}" "$state_file"; then
             SHOULD_LAUNCH_A1=false
