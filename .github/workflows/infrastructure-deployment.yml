@@ -348,6 +348,7 @@ jobs:
 
       - name: 保存实例状态缓存
         if: always()
+        continue-on-error: true
         uses: actions/cache/save@v5
         with:
           path: .cache/oci-state
