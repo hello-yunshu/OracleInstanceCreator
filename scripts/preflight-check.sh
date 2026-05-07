@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/utils.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/utils.sh"
 
 # Track validation status
 VALIDATION_ERRORS=0
@@ -19,7 +19,7 @@ echo ""
 # Increment error counter and log error
 validation_error() {
     local message="$1"
-    ((VALIDATION_ERRORS++))
+    ((VALIDATION_ERRORS += 1))
     log_error "✗ $message"
 }
 

@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/utils.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/utils.sh"
 
 validate_oci_configuration() {
     log_info "正在验证 OCI 配置..."

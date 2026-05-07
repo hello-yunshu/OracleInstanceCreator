@@ -69,7 +69,7 @@ concurrency:
 
 env:
   # 全局环境变量 - 双调试标志支持
-  OCI_CLI_DEBUG: ${{ inputs.oci_cli_debug && 'true' || 'false' }}
+  OCI_CLI_DEBUG: ${{ github.event_name == 'workflow_dispatch' && (inputs.oci_cli_debug && 'true' || 'false') || 'false' }}
   INTERNAL_DEBUG: ${{ github.event_name == 'workflow_dispatch' && (inputs.internal_debug && 'true' || 'false') || 'true' }}
   ENABLE_NOTIFICATIONS: ${{ github.event_name == 'workflow_dispatch' && (inputs.send_notifications && 'true' || 'false') || 'true' }}
   # 默认启用实例检查以使用状态管理缓存（可手动覆盖）
@@ -80,11 +80,12 @@ env:
 jobs:
   create-instance:
     # 如果实例已创建则跳过（除非手动重置）
-    if: ${{ github.event.repository.vars.INSTANCE_CREATED != 'true' || inputs.reset_success_state }}
+    if: ${{ vars.INSTANCE_CREATED != 'true' || (github.event_name == 'workflow_dispatch' && inputs.reset_success_state) }}
     runs-on: ubuntu-latest
     name: 部署 OCI 基础设施（并行编排）
     permissions:
       contents: write
+      actions: write
     outputs:
       script_exit_code: ${{ steps.launch-instances.outputs.script_exit_code }}
     env:
@@ -126,14 +127,14 @@ jobs:
       LOG_FORMAT: "text"
       # 缓存镜像 ID（需定期更新，以下为新加坡区域镜像）
       # 切换区域时需更新为对应区域的镜像 OCID，或留空让脚本自动查询
-      OCI_CACHED_OL10_ARM_IMAGE: "ocid1.image.oc1.ap-singapore-1.aaaaaaaay4vc5rcekxthq7cillis3qred5xyz7kmqd6wuaoknk4zukohqlua"
-      OCI_CACHED_OL10_AMD_IMAGE: "ocid1.image.oc1.ap-singapore-1.aaaaaaaaitll52n3sr73g2gaclby2ph5whrmb5l3tbo47i6atle6z3cemr6a"
+      OCI_CACHED_OL10_ARM_IMAGE: ${{ secrets.OCI_CACHED_OL10_ARM_IMAGE || (secrets.OCI_REGION == 'ap-singapore-1' && 'ocid1.image.oc1.ap-singapore-1.aaaaaaaay4vc5rcekxthq7cillis3qred5xyz7kmqd6wuaoknk4zukohqlua' || '') }}
+      OCI_CACHED_OL10_AMD_IMAGE: ${{ secrets.OCI_CACHED_OL10_AMD_IMAGE || (secrets.OCI_REGION == 'ap-singapore-1' && 'ocid1.image.oc1.ap-singapore-1.aaaaaaaaitll52n3sr73g2gaclby2ph5whrmb5l3tbo47i6atle6z3cemr6a' || '') }}
       # 自适应调度配置
-      ENABLE_ADAPTIVE_SCHEDULING: ${{ inputs.adaptive_scheduling && 'true' || 'false' }}
-      ENABLE_REGION_OPTIMIZATION: ${{ inputs.region_optimization && 'true' || 'false' }}
+      ENABLE_ADAPTIVE_SCHEDULING: ${{ github.event_name == 'workflow_dispatch' && (inputs.adaptive_scheduling && 'true' || 'false') || 'true' }}
+      ENABLE_REGION_OPTIMIZATION: ${{ github.event_name == 'workflow_dispatch' && (inputs.region_optimization && 'true' || 'false') || 'true' }}
       # 区域时区（新加坡: Asia/Singapore, 圣何塞: America/Los_Angeles, 阿什本: America/New_York）
       # 也可通过 Secret OCI_REGION_TIMEZONE 覆盖
-      OCI_REGION_TIMEZONE: ${{ secrets.OCI_REGION_TIMEZONE || 'America/Los_Angeles' }}
+      OCI_REGION_TIMEZONE: ${{ secrets.OCI_REGION_TIMEZONE || 'Asia/Singapore' }}
       SUCCESS_TRACKING_ENABLED: "true"
     steps:
       - name: 检出仓库
@@ -146,7 +147,7 @@ jobs:
       - name: 生成缓存键（含区域哈希）
         id: cache-key
         env:
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ secrets.OCI_REGION || 'ap-singapore-1' }}
         run: |
           region_hash=$(echo -n "$OCI_REGION" | sha256sum | cut -d' ' -f1 | head -c 8)
           echo "key=oci-instances-${region_hash}-v1-${{ steps.get-date.outputs.date }}" >> "$GITHUB_OUTPUT"
@@ -175,9 +176,10 @@ jobs:
           fi
 
       - name: 重置成功状态（如已请求）
-        if: inputs.reset_success_state
+        if: github.event_name == 'workflow_dispatch' && inputs.reset_success_state
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "正在重置 INSTANCE_CREATED 变量以允许新的部署尝试"
           gh variable set INSTANCE_CREATED --body "false" || true
@@ -189,6 +191,7 @@ jobs:
         if: env.ENABLE_ADAPTIVE_SCHEDULING == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/adaptive-scheduler.sh
 
       - name: 创建依赖文件
@@ -268,6 +271,7 @@ jobs:
         id: launch-instances
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
@@ -358,6 +362,7 @@ jobs:
         if: always() && env.ENABLE_ADAPTIVE_SCHEDULING == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OCI_REGION: ${{ secrets.OCI_REGION }}
         run: ./scripts/schedule-optimizer.sh
 

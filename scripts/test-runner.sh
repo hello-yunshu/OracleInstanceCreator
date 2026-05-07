@@ -29,15 +29,15 @@ run_test_suite() {
     echo -e "${BLUE}Running test suite: $suite_name${NC}"
     echo "=" "$(printf '=%.0s' {1..50})"
     
-    ((TOTAL_SUITES++))
+    ((TOTAL_SUITES += 1))
     
     if bash "$test_file"; then
         echo -e "${GREEN}✓ Test suite '$suite_name' passed${NC}\n"
-        ((PASSED_SUITES++))
+        ((PASSED_SUITES += 1))
         return 0
     else
         echo -e "${RED}✗ Test suite '$suite_name' failed${NC}\n"
-        ((FAILED_SUITES++))
+        ((FAILED_SUITES += 1))
         return 1
     fi
 }

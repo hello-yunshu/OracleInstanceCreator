@@ -43,7 +43,9 @@ get_memory_usage() {
 get_cpu_usage() {
     if command -v top >/dev/null 2>&1; then
         # Get CPU usage using top (works on both Linux and macOS)
-        top -l 1 -n 0 | awk '/CPU usage/ { print $3 }' | sed 's/%//' 2>/dev/null || echo "0"
+        local cpu_usage
+        cpu_usage=$(top -l 1 -n 0 2>/dev/null | awk '/CPU usage/ { print $3 }' | sed 's/%//' 2>/dev/null || true)
+        echo "${cpu_usage:-0}"
     else
         echo "0"
     fi
@@ -160,15 +162,16 @@ test_concurrent_executions() {
     
     for pid in "${pids[@]}"; do
         if wait "$pid"; then
-            ((completed++))
+            ((completed += 1))
         else
-            ((failed++))
+            ((failed += 1))
         fi
     done
     
     # Stop monitoring
     monitoring=false
     kill $monitor_pid 2>/dev/null || true
+    wait "$monitor_pid" 2>/dev/null || true
     
     local end_time
     end_time=$(date +%s.%N)
@@ -192,10 +195,10 @@ test_concurrent_executions() {
     # Pass criteria: All processes complete successfully and reasonable resource usage
     if [[ $completed -eq $concurrent_count ]] && [[ $failed -eq 0 ]] && [[ $result_files -eq $concurrent_count ]]; then
         echo "✅ PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "❌ FAIL: $test_name - Incomplete execution or failures"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     rm -rf "$temp_dir"
@@ -232,7 +235,7 @@ for i in {1..5}; do
         # CPU intensive calculation
         counter=0
         while [[ $counter -lt 100000 ]]; do
-            ((counter++))
+            ((counter += 1))
         done
     ) &
 done
@@ -277,8 +280,8 @@ EOF
     # Wait for completion
     local completed=0
     for pid in "${pids[@]}"; do
-        if timeout 30 bash -c "wait $pid"; then
-            ((completed++))
+        if wait "$pid"; then
+            ((completed += 1))
         else
             kill -9 "$pid" 2>/dev/null || true
         fi
@@ -293,7 +296,7 @@ EOF
     
     # Check results
     local result_files
-    result_files=$(find "$temp_dir" -name "heavy_result_*" | wc -l)
+    result_files=$(find "$temp_dir" -name "heavy_result_*" | wc -l | tr -d '[:space:]')
     
     printf "  Heavy load execution time: %.2fs\n" "$execution_time"
     echo "  Completed heavy processes: $completed/3"
@@ -303,10 +306,10 @@ EOF
     # Pass if most processes completed and system stayed responsive
     if [[ $completed -ge 2 ]] && [[ "$system_responsive" == "true" ]]; then
         echo "✅ PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "❌ FAIL: $test_name - System overload or unresponsiveness"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     rm -rf "$temp_dir"
@@ -358,7 +361,7 @@ test_memory_leak_detection() {
     
     # Analyze memory trend
     local memory_increase
-    local final_memory="${memory_samples[-1]}"
+    local final_memory="${memory_samples[$((${#memory_samples[@]} - 1))]}"
     memory_increase=$(echo "$final_memory - $initial_memory" | bc -l)
     
     printf "  Initial memory: %.1f MB\n" "$initial_memory"
@@ -368,10 +371,10 @@ test_memory_leak_detection() {
     # Memory leak detection: increase should be minimal (< 50MB)
     if (( $(echo "$memory_increase < 50" | bc -l) )); then
         echo "✅ PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "❌ FAIL: $test_name - Potential memory leak detected"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     rm -rf "$temp_dir"
@@ -421,7 +424,7 @@ EOF
     local available_success=0
     for pid in "${available_pids[@]}"; do
         if wait "$pid"; then
-            ((available_success++))
+            ((available_success += 1))
         fi
     done
     
@@ -436,7 +439,7 @@ EOF
     local unavailable_failures=0
     for pid in "${unavailable_pids[@]}"; do
         if ! wait "$pid"; then
-            ((unavailable_failures++))
+            ((unavailable_failures += 1))
         fi
     done
     
@@ -446,10 +449,10 @@ EOF
     # Pass if network available cases succeed and network unavailable cases fail appropriately
     if [[ $available_success -eq 3 ]] && [[ $unavailable_failures -eq 3 ]]; then
         echo "✅ PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "❌ FAIL: $test_name - Network simulation not working correctly"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     rm -rf "$temp_dir"
@@ -525,9 +528,9 @@ EOF
     
     for pid in "${pids[@]}"; do
         if wait "$pid"; then
-            ((successes++))
+            ((successes += 1))
         else
-            ((rate_limited++))
+            ((rate_limited += 1))
         fi
     done
     
@@ -548,10 +551,10 @@ EOF
     # Pass if some requests succeeded and some were rate limited
     if [[ $successes -gt 0 ]] && [[ $rate_limited -gt 0 ]]; then
         echo "✅ PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "❌ FAIL: $test_name - Rate limiting not working as expected"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     rm -rf "$temp_dir"

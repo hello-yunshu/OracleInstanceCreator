@@ -59,7 +59,7 @@
 | `OCI_BOOT_VOLUME_ID` | ❌ | 通用引导卷 OCID（形状专用 ID 未设置时回退使用） |
 | `OCI_A1_BOOT_VOLUME_ID` | ❌ | A1.Flex 专用引导卷 OCID（优先于通用 ID） |
 | `OCI_E2_BOOT_VOLUME_ID` | ❌ | E2.Micro 专用引导卷 OCID（优先于通用 ID） |
-| `SKIP_SHAPES` | ❌ | 跳过指定形状（默认 `E2` 只申请 A1，设为 `A1` 只申请 E2，留空申请全部） |
+| `SKIP_SHAPES` | ❌ | 跳过指定形状（默认 `E2` 只申请 A1；设为 `A1` 只申请 E2；设为 `NONE`/`ALL` 申请全部） |
 
 ### 3. 启用 GitHub Actions
 
@@ -68,6 +68,22 @@
 ### 4. 运行工作流
 
 手动触发 **Infrastructure Deployment** 工作流。
+
+### 5. 启用监控网页
+
+这个仓库的静态网页入口在 `docs/index.html`，仪表板在 `docs/dashboard/index.html`。在 GitHub 上启用方式：
+
+1. 进入仓库 **Settings → Pages**
+2. **Build and deployment → Source** 选择 **Deploy from a branch**
+3. **Branch** 选择 `main`，目录选择 `/docs`
+4. 点击 **Save**
+5. 等待 GitHub Pages 部署完成后访问：
+
+```text
+https://<你的 GitHub 用户名>.github.io/OracleInstanceCreator/
+```
+
+如果仓库名不是 `OracleInstanceCreator`，把 URL 最后一段替换成实际仓库名。`docs/index.html` 会自动跳转到 `/dashboard/`。
 
 ## 参数获取教程
 
@@ -232,7 +248,7 @@
 | `OCI_MEMORY_IN_GBS` | `24` | 内存 GB（仅 Flex 形状） |
 | `BOOT_VOLUME_SIZE` | `50` | 引导卷大小（GB，最低 50） |
 | `ASSIGN_PUBLIC_IP` | `true` | 是否分配公网 IP |
-| `SKIP_SHAPES` | `E2` | 跳过指定形状（`E2` 只申请 A1，`A1` 只申请 E2，留空申请全部） |
+| `SKIP_SHAPES` | `E2` | 跳过指定形状（默认只申请 A1；`A1` 只申请 E2；`NONE`/`ALL` 申请全部） |
 | `RECOVERY_ACTION` | `RESTORE_INSTANCE` | 实例恢复策略 |
 
 ### 重试配置
@@ -266,9 +282,6 @@ OracleInstanceCreator/
 ├── .github/workflows/
 │   └── infrastructure-deployment.yml   # GitHub Actions 工作流
 ├── config/
-│   ├── defaults.yml                    # 默认配置
-│   ├── instance-profiles.yml           # 实例配置档案
-│   ├── regions.yml                     # 区域与可用域定义
 │   └── templates/                      # 配置模板
 ├── scripts/
 │   ├── launch-parallel.sh              # 并行启动编排器

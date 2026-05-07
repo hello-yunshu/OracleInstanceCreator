@@ -126,7 +126,7 @@ acquire_state_lock() {
         
         log_debug "等待状态锁... ($((wait_count + 1))/$timeout)"
         sleep 1
-        ((wait_count++))
+        ((wait_count += 1))
     done
     
     log_error "在 ${timeout}s 后获取状态锁失败: $lock_file"
@@ -234,7 +234,7 @@ init_state_file() {
     local timestamp
     timestamp=$(date +%s)
     
-    cat > "$state_file" << EOF
+    if ! cat > "$state_file" << EOF
 {
   "version": "$CACHE_VERSION",
   "region": "${OCI_REGION:-}",
@@ -249,6 +249,10 @@ init_state_file() {
   }
 }
 EOF
+    then
+        log_error "初始化状态文件失败: $state_file"
+        return 1
+    fi
     
     log_debug "已初始化空状态文件: $state_file"
 }
@@ -489,7 +493,7 @@ validate_state_file() {
     local state_version
     state_version=$(jq -r '.version // ""' "$state_file")
     if [[ "$state_version" != "$CACHE_VERSION" ]]; then
-        log_warning "状态文件版本不匹配（期望: $CACHE_VERSION，实际: $state_version）"
+        log_warning "状态文件版本不匹配（期望: ${CACHE_VERSION}，实际: ${state_version}）"
         return 1
     fi
     
@@ -684,7 +688,7 @@ should_create_instance() {
     # Method 3: Environment variable fallback (medium priority)
     if [[ -z "$shape" && -n "${OCI_SHAPE:-}" ]]; then
         shape="$OCI_SHAPE"
-        log_debug "使用环境变量中的形状 $instance_name: $shape（环境回退）"
+        log_debug "使用环境变量中的形状 ${instance_name}: ${shape}（环境回退）"
     fi
     
     # Method 4: Check instance state for existing shape information
@@ -693,7 +697,7 @@ should_create_instance() {
         cached_shape=$(jq -r ".instances[\"$instance_name\"].shape // \"\"" "$state_file" 2>/dev/null || echo "")
         if [[ -n "$cached_shape" && "$cached_shape" != "null" ]]; then
             shape="$cached_shape"
-            log_debug "从缓存实例状态获取形状 $instance_name: $shape（缓存形状）"
+            log_debug "从缓存实例状态获取形状 ${instance_name}: ${shape}（缓存形状）"
         fi
     fi
     
@@ -708,7 +712,7 @@ should_create_instance() {
     if [[ -n "$shape" ]]; then
         log_debug "正在检查形状限额状态: $shape"
         if get_cached_limit_state "$shape" "$state_file"; then
-            log_info "形状 $shape 免费层限额已达（实例: $instance_name），跳过创建"
+            log_info "形状 ${shape} 免费层限额已达（实例: ${instance_name}），跳过创建"
             log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 跳过（限额已达）==="
             return 1  # Don't create - limit reached
         else
@@ -733,17 +737,17 @@ should_create_instance() {
     case "$status" in
         "created"|"verified"|"running")
             log_info "实例在状态中存在，状态 '$status'，跳过创建: $instance_name"
-            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 跳过（存在，状态 $status）==="
+            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 跳过（存在，状态 ${status}）==="
             return 1  # Don't create
             ;;
         "failed"|"terminated")
             log_info "实例在状态中存在，状态 '$status'，允许重新创建: $instance_name"
-            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（重新创建，状态 $status）==="
+            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（重新创建，状态 ${status}）==="
             return 0  # Allow creation
             ;;
         *)
             log_debug "实例在状态中存在，未知状态 '$status'，允许创建: $instance_name"
-            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（未知状态 $status）==="
+            log_debug "=== SHOULD_CREATE_INSTANCE 调试结束: 允许（未知状态 ${status}）==="
             return 0  # Allow creation for safety
             ;;
     esac
@@ -1127,7 +1131,7 @@ get_cached_limit_state() {
         log_debug "=== GET_CACHED_LIMIT_STATE 调试结束: 限额已达 ==="
         return 0  # Limit is cached as reached
     else
-        log_debug "形状 $shape 无缓存限额（值: $limit_reached）"
+        log_debug "形状 ${shape} 无缓存限额（值: ${limit_reached}）"
         log_debug "=== GET_CACHED_LIMIT_STATE 调试结束: 无限额（未达限额）==="
         return 1  # No limit cached
     fi

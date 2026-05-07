@@ -23,6 +23,10 @@ readonly TEST_AD_3="test:AP-SINGAPORE-1-AD-3"
 TESTS_RUN=0
 TESTS_PASSED=0
 TESTS_FAILED=0
+TEST_ASSERTION_FAILED=0
+
+TEST_STATE_DIR="${TMPDIR:-/tmp}/circuit-breaker-tests-$$"
+export STATE_DIR="$TEST_STATE_DIR"
 
 # Test utilities
 run_test() {
@@ -49,6 +53,7 @@ assert_equals() {
     if [[ "$expected" == "$actual" ]]; then
         return 0
     else
+        TEST_ASSERTION_FAILED=1
         if [[ -n "$message" ]]; then
             echo "ASSERTION FAILED: $message"
         fi
@@ -77,6 +82,9 @@ assert_not_equals() {
 
 # Setup and cleanup functions
 setup_test() {
+    TEST_ASSERTION_FAILED=0
+    mkdir -p "$TEST_STATE_DIR"
+
     # Reset all AD failures before each test
     reset_all_ad_failures >/dev/null 2>&1 || true
 }
@@ -84,6 +92,7 @@ setup_test() {
 cleanup_test() {
     # Clean up after each test
     reset_all_ad_failures >/dev/null 2>&1 || true
+    [[ "$TEST_ASSERTION_FAILED" -eq 0 ]]
 }
 
 # Test functions
@@ -311,8 +320,10 @@ echo "Failed: $TESTS_FAILED"
 
 if [[ $TESTS_FAILED -eq 0 ]]; then
     echo "✅ All circuit breaker tests passed!"
+    rm -rf "$TEST_STATE_DIR"
     exit 0
 else
     echo "❌ Some circuit breaker tests failed!"
+    rm -rf "$TEST_STATE_DIR"
     exit 1
 fi

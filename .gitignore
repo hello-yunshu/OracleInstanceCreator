@@ -10,6 +10,9 @@ out/
 ## Trae IDE
 .trae/
 
+## Codex local workspace settings
+.codex/
+
 ## Visual Studio Code
 .vscode/
 *.code-workspace

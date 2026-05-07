@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/utils.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/utils.sh"
 
 # Regional scheduling patterns based on Oracle Cloud regions
 get_regional_pattern() {
@@ -95,7 +95,7 @@ generate_cron_patterns() {
             ;;
             
         *)
-            log_warning "未知区域 $region，使用新加坡默认值"
+            log_warning "未知区域 ${region}，使用新加坡默认值"
             echo "# Default Singapore-optimized schedule"
             echo 'schedule_aggressive: "*/15 2-7 * * *"'
             echo 'schedule_conservative: "0 8-23,0-1 * * *"'

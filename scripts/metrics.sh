@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/utils.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/utils.sh"
 
 # Metrics file location (temporary, cleared on each run)
 METRICS_FILE="${TMPDIR:-/tmp}/oci_ad_metrics_$$"

@@ -36,7 +36,7 @@ else
             
             echo "[DEBUG] 第 $attempt 次重试失败，等待 ${delay}s..." >&2
             sleep "$delay"
-            ((attempt++))
+            ((attempt += 1))
             delay=$((delay * 2))
         done
         return 1

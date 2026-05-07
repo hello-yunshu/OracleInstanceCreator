@@ -43,14 +43,14 @@ run_test() {
     local test_name="$1"
     local test_function="$2"
     
-    ((TESTS_RUN++))
+    ((TESTS_RUN += 1))
     test_log_info "Running: $test_name"
     
     if $test_function; then
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
         test_log_success "$test_name"
     else
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
         test_log_error "$test_name"
     fi
     echo

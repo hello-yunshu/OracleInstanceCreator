@@ -30,6 +30,7 @@ setup_test_environment() {
     umask 077
     TEST_TEMP_DIR=$(mktemp -d)
     export TMPDIR="$TEST_TEMP_DIR"
+    export TEST_TEMP_DIR
     
     # Mock environment variables for testing
     export OCI_USER_OCID="ocid1.user.oc1..test"
@@ -59,12 +60,12 @@ assert_equals() {
     
     if [[ "$expected" == "$actual" ]]; then
         echo "  ${GREEN}✓${RESET} $message"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "  ${RED}✗${RESET} $message"
         echo "    Expected: $expected"
         echo "    Actual: $actual"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -74,10 +75,10 @@ assert_file_exists() {
     
     if [[ -f "$file_path" ]]; then
         echo "  ${GREEN}✓${RESET} $message"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "  ${RED}✗${RESET} $message"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -87,10 +88,10 @@ assert_file_not_exists() {
     
     if [[ ! -f "$file_path" ]]; then
         echo "  ${GREEN}✓${RESET} $message"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "  ${RED}✗${RESET} $message"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -246,8 +247,6 @@ test_signal_handling_cleanup() {
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$0")/../scripts/utils.sh"
-
 PID_A1=""
 PID_E2=""
 temp_dir=""
@@ -270,17 +269,14 @@ PID_A1=$!
 sleep 10 &
 PID_E2=$!
 
+(sleep 0.2; kill -TERM $$) &
 wait
 EOF
     chmod +x "$test_script"
     
-    # Run the script in background and send it a signal
-    "$test_script" &
-    local script_pid=$!
-    sleep 0.1  # Give it time to set up
-    
-    kill -TERM $script_pid 2>/dev/null || true
-    sleep 0.5  # Give it time to cleanup
+    set +e
+    "$test_script"
+    set -e
     
     assert_file_exists "$TEST_TEMP_DIR/cleanup_log" "Cleanup handler should be called on SIGTERM"
 }

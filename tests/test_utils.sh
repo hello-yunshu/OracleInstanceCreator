@@ -22,14 +22,14 @@ assert_equal() {
     local actual="$2"
     local description="${3:-}"
     
-    ((TEST_COUNT++))
+    ((TEST_COUNT += 1))
     
     if [[ "$expected" == "$actual" ]]; then
-        ((PASSED_COUNT++))
+        ((PASSED_COUNT += 1))
         echo -e "${GREEN}✓${NC} PASS: $description"
         return 0
     else
-        ((FAILED_COUNT++))
+        ((FAILED_COUNT += 1))
         echo -e "${RED}✗${NC} FAIL: $description"
         echo -e "  Expected: '$expected'"
         echo -e "  Actual:   '$actual'"
@@ -42,14 +42,14 @@ assert_contains() {
     local needle="$2"
     local description="${3:-}"
     
-    ((TEST_COUNT++))
+    ((TEST_COUNT += 1))
     
     if [[ "$haystack" == *"$needle"* ]]; then
-        ((PASSED_COUNT++))
+        ((PASSED_COUNT += 1))
         echo -e "${GREEN}✓${NC} PASS: $description"
         return 0
     else
-        ((FAILED_COUNT++))
+        ((FAILED_COUNT += 1))
         echo -e "${RED}✗${NC} FAIL: $description"
         echo -e "  Expected '$haystack' to contain '$needle'"
         return 1
@@ -60,14 +60,14 @@ assert_success() {
     local command="$1"
     local description="${2:-}"
     
-    ((TEST_COUNT++))
+    ((TEST_COUNT += 1))
     
     if eval "$command" >/dev/null 2>&1; then
-        ((PASSED_COUNT++))
+        ((PASSED_COUNT += 1))
         echo -e "${GREEN}✓${NC} PASS: $description"
         return 0
     else
-        ((FAILED_COUNT++))
+        ((FAILED_COUNT += 1))
         echo -e "${RED}✗${NC} FAIL: $description"
         echo -e "  Command failed: $command"
         return 1
@@ -78,14 +78,14 @@ assert_failure() {
     local command="$1"
     local description="${2:-}"
     
-    ((TEST_COUNT++))
+    ((TEST_COUNT += 1))
     
     if ! eval "$command" >/dev/null 2>&1; then
-        ((PASSED_COUNT++))
+        ((PASSED_COUNT += 1))
         echo -e "${GREEN}✓${NC} PASS: $description"
         return 0
     else
-        ((FAILED_COUNT++))
+        ((FAILED_COUNT += 1))
         echo -e "${RED}✗${NC} FAIL: $description"
         echo -e "  Expected command to fail: $command"
         return 1
@@ -95,7 +95,7 @@ assert_failure() {
 # Test setup
 setup() {
     # Source the utils script
-    source "$(dirname "$0")/../scripts/utils.sh"
+    source "$(dirname "${BASH_SOURCE[0]:-$0}")/../scripts/utils.sh"
     
     # Redirect log output to suppress during tests
     exec 3>&2 2>/dev/null

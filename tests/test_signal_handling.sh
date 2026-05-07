@@ -44,12 +44,12 @@ assert_equals() {
     
     if [[ "$expected" == "$actual" ]]; then
         echo "  ${GREEN}✓${RESET} $message"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "  ${RED}✗${RESET} $message"
         echo "    Expected: $expected"
         echo "    Actual: $actual"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -59,10 +59,10 @@ assert_file_exists() {
     
     if [[ -f "$file_path" ]]; then
         echo "  ${GREEN}✓${RESET} $message"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "  ${RED}✗${RESET} $message"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -118,22 +118,14 @@ PID_E2=$!
 echo "Started E2 process: $PID_E2" >> "$TEST_TEMP_DIR/test_log"
 
 # Wait for signal
+(sleep 0.2; kill -TERM $$) &
 wait
 EOF
     chmod +x "$test_script"
     
-    # Start the test script
-    "$test_script" &
-    local script_pid=$!
-    
-    # Give it time to set up
-    sleep 0.2
-    
-    # Send SIGTERM
-    kill -TERM $script_pid
-    
-    # Wait for cleanup to complete
-    sleep 0.5
+    set +e
+    "$test_script"
+    set -e
     
     # Check if cleanup was called
     assert_file_exists "$TEST_TEMP_DIR/cleanup_trace" "Cleanup trace should be created"
@@ -189,16 +181,14 @@ PID_A1=$!
 sleep 30 &
 PID_E2=$!
 
+(sleep 0.2; kill -INT $$) &
 wait
 EOF
     chmod +x "$test_script"
     
-    "$test_script" &
-    local script_pid=$!
-    
-    sleep 0.2
-    kill -INT $script_pid
-    sleep 0.5
+    set +e
+    "$test_script"
+    set -e
     
     assert_file_exists "$TEST_TEMP_DIR/sigint_trace" "SIGINT cleanup should be called"
 }
@@ -241,19 +231,14 @@ PID_A1=$!
 (while true; do echo "E2_ALIVE" >> "$TEST_TEMP_DIR/e2_log"; sleep 0.1; done) &
 PID_E2=$!
 
+(sleep 0.2; kill -TERM $$) &
 wait
 EOF
     chmod +x "$test_script"
     
-    "$test_script" &
-    local script_pid=$!
-    
-    # Let processes run briefly
-    sleep 0.3
-    
-    # Send signal
-    kill -TERM $script_pid
-    sleep 0.2
+    set +e
+    "$test_script"
+    set -e
     
     # Check if processes were terminated
     assert_file_exists "$TEST_TEMP_DIR/process_trace" "Process termination trace should exist"
@@ -298,16 +283,14 @@ echo "TEMP_CREATED:$temp_dir" >> "$TEST_TEMP_DIR/temp_trace"
 echo "test1" > "$temp_dir/file1"
 echo "test2" > "$temp_dir/file2"
 
+(sleep 0.2; kill -TERM $$) &
 wait
 EOF
     chmod +x "$test_script"
     
-    "$test_script" &
-    local script_pid=$!
-    
-    sleep 0.1
-    kill -TERM $script_pid
-    sleep 0.2
+    set +e
+    "$test_script"
+    set -e
     
     assert_file_exists "$TEST_TEMP_DIR/temp_trace" "Temp directory trace should exist"
     

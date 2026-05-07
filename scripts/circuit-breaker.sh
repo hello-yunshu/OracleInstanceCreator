@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source "$(dirname "$0")/utils.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/utils.sh"
 
 readonly MAX_CONSECUTIVE_FAILURES=3
 readonly CIRCUIT_BREAKER_RESET_HOURS=24
@@ -177,7 +177,7 @@ get_available_ads() {
         ad=$(echo "$ad" | xargs)
         
         if should_skip_ad "$ad"; then
-            log_info "跳过 AD $ad（熔断器开启）"
+            log_info "跳过 AD ${ad}（熔断器开启）"
             continue
         fi
         

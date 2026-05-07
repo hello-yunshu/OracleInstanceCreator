@@ -131,22 +131,22 @@ validate_constants() {
 
     if [[ "$GITHUB_ACTIONS_BILLING_TIMEOUT" -ge "$GITHUB_ACTIONS_BILLING_BOUNDARY" ]]; then
         echo "错误: GITHUB_ACTIONS_BILLING_TIMEOUT ($GITHUB_ACTIONS_BILLING_TIMEOUT) 必须小于计费边界 ($GITHUB_ACTIONS_BILLING_BOUNDARY)" >&2
-        ((errors++))
+        ((errors += 1))
     fi
 
     if [[ "$OCI_CONNECTION_TIMEOUT_SECONDS" -ge "$OCI_READ_TIMEOUT_SECONDS" ]]; then
         echo "警告: OCI_CONNECTION_TIMEOUT_SECONDS 建议小于 OCI_READ_TIMEOUT_SECONDS" >&2
-        ((errors++))
+        ((errors += 1))
     fi
 
     if [[ "$BOOT_VOLUME_SIZE_MIN" -lt 50 ]]; then
         echo "错误: BOOT_VOLUME_SIZE_MIN ($BOOT_VOLUME_SIZE_MIN) 不能小于 Oracle 最低要求 (50GB)" >&2
-        ((errors++))
+        ((errors += 1))
     fi
 
     if [[ "$CACHE_TTL_HOURS_DEFAULT" -lt "$CACHE_TTL_HOURS_MIN" ]] || [[ "$CACHE_TTL_HOURS_DEFAULT" -gt "$CACHE_TTL_HOURS_MAX" ]]; then
         echo "错误: CACHE_TTL_HOURS_DEFAULT ($CACHE_TTL_HOURS_DEFAULT) 必须在 $CACHE_TTL_HOURS_MIN 和 $CACHE_TTL_HOURS_MAX 之间" >&2
-        ((errors++))
+        ((errors += 1))
     fi
 
     return "$errors"

@@ -8,6 +8,7 @@ set -euo pipefail
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$TEST_DIR")"
 SCRIPTS_DIR="$PROJECT_ROOT/scripts"
+export PROJECT_ROOT
 
 source "$SCRIPTS_DIR/utils.sh"
 
@@ -49,12 +50,12 @@ assert_equals() {
     
     if [[ "$expected" == "$actual" ]]; then
         echo "  ${GREEN}✓${RESET} $message"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "  ${RED}✗${RESET} $message"
         echo "    Expected: $expected"
         echo "    Actual: $actual"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -65,12 +66,12 @@ assert_contains() {
     
     if [[ "$haystack" == *"$needle"* ]]; then
         echo "  ${GREEN}✓${RESET} $message"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "  ${RED}✗${RESET} $message"
         echo "    Looking for: $needle"
         echo "    In: $haystack"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -101,8 +102,10 @@ test_ad_list_parsing() {
     }
     
     # Test with the mock AD list
-    local ad_array
-    mapfile -t ad_array < <(parse_ad_list "$OCI_AD")
+    local ad_array=()
+    while IFS= read -r ad; do
+        ad_array+=("$ad")
+    done < <(parse_ad_list "$OCI_AD")
     
     assert_equals "3" "${#ad_array[@]}" "Should parse 3 ADs from comma-separated list"
     assert_equals "test:US-ASHBURN-1-AD-1" "${ad_array[0]}" "First AD should be parsed correctly"
@@ -169,6 +172,7 @@ EOF
 
 test_ad_cycling_logic() {
     echo "${YELLOW}Testing AD cycling with failover...${RESET}"
+    rm -f "$TEST_TEMP_DIR/ad2_attempted"
     
     # Create a test function that simulates the AD cycling logic
     local test_cycling_script="$TEST_TEMP_DIR/test_cycling.sh"
@@ -176,7 +180,7 @@ test_ad_cycling_logic() {
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$0")/../scripts/utils.sh"
+source "$PROJECT_ROOT/scripts/utils.sh"
 
 # Mock the create_instance function to use our mock OCI
 create_instance() {
@@ -184,15 +188,21 @@ create_instance() {
     export CURRENT_AD="$ad"
     
     log_debug "Attempting instance creation in $ad"
+    local output
+    local status
     
-    if "$TEST_TEMP_DIR/mock_oci.sh"; then
+    set +e
+    output=$("$TEST_TEMP_DIR/mock_oci.sh" 2>&1)
+    status=$?
+    set -e
+
+    if [[ $status -eq 0 ]]; then
+        echo "$output"
         log_success "Instance created successfully in $ad"
         return 0
     else
-        local error_output
-        error_output=$("$TEST_TEMP_DIR/mock_oci.sh" 2>&1 || true)
         local error_type
-        error_type=$(get_error_type "$error_output")
+        error_type=$(get_error_type "$output")
         
         log_warning "Instance creation failed in $ad: $error_type"
         
@@ -288,28 +298,28 @@ EOF
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$0")/../scripts/utils.sh"
+source "$PROJECT_ROOT/scripts/utils.sh"
 
 create_instance() {
     local ad="$1"
     echo "$ad:CAPACITY" >> "$TEST_TEMP_DIR/all_attempts.log"
-    return $EXIT_CAPACITY_ERROR
+    return "$OCI_EXIT_CAPACITY_ERROR"
 }
 
 # Try all ADs and expect all to fail
-local ad_list="$OCI_AD"
-local -a ads=()
-local temp_list="$ad_list"
+ad_list="$OCI_AD"
+ads=()
+temp_list="$ad_list"
 
 while [[ "$temp_list" == *","* ]]; do
-    local ad="${temp_list%%,*}"
+    ad="${temp_list%%,*}"
     ad=$(echo "$ad" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     [[ -n "$ad" ]] && ads+=("$ad")
     temp_list="${temp_list#*,}"
 done
 
 if [[ -n "$temp_list" ]]; then
-    local ad=$(echo "$temp_list" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    ad=$(echo "$temp_list" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     [[ -n "$ad" ]] && ads+=("$ad")
 fi
 
@@ -328,7 +338,7 @@ EOF
     # Verify all ADs were attempted
     if [[ -f "$TEST_TEMP_DIR/all_attempts.log" ]]; then
         local attempt_count
-        attempt_count=$(wc -l < "$TEST_TEMP_DIR/all_attempts.log")
+        attempt_count=$(wc -l < "$TEST_TEMP_DIR/all_attempts.log" | tr -d '[:space:]')
         assert_equals "3" "$attempt_count" "Should attempt all 3 ADs when all fail"
     fi
     

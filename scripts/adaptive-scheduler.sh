@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/utils.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/utils.sh"
 
 # Adaptive scheduling configuration
 PATTERN_ANALYSIS_ENABLED="${SUCCESS_TRACKING_ENABLED:-true}"
@@ -101,7 +101,7 @@ record_attempt_context() {
             else
                 retry_count=$((retry_count + 1))
                 if [[ $retry_count -lt $max_retries ]]; then
-                    log_info "GitHub API 失败，正在重试...（$retry_count/$max_retries）"
+                    log_info "GitHub API 失败，正在重试...（${retry_count}/${max_retries}）"
                     sleep $((2 * retry_count))  # Exponential backoff: 2s, 4s, 6s
                 else
                     log_error "在 $max_retries 次尝试后仍无法更新模式追踪数据"

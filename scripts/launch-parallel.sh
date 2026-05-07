@@ -12,10 +12,10 @@
 set -euo pipefail
 
 # shellcheck source=scripts/utils.sh
-source "$(dirname "$0")/utils.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/utils.sh"
 # shellcheck source=scripts/notify.sh
-source "$(dirname "$0")/notify.sh"
-source "$(dirname "$0")/state-manager.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/notify.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/state-manager.sh"
 
 # Global variables for signal handling
 PID_A1=""
@@ -170,7 +170,7 @@ count_actual_instances() {
             "${ACTIVE_LIFECYCLE_STATES[@]}" \
             --query 'data[0].id' \
             --raw-output) && [[ -n "$a1_instance_id" && "$a1_instance_id" != "null" ]]; then
-            ((actual_count++))
+            ((actual_count += 1))
         fi
     fi
     
@@ -183,7 +183,7 @@ count_actual_instances() {
             "${ACTIVE_LIFECYCLE_STATES[@]}" \
             --query 'data[0].id' \
             --raw-output) && [[ -n "$e2_instance_id" && "$e2_instance_id" != "null" ]]; then
-            ((actual_count++))
+            ((actual_count += 1))
         fi
     fi
     
@@ -261,7 +261,7 @@ verify_instance_exists() {
                     --raw-output 2>/dev/null || echo "")
                 
                 if [[ -n "$state" && "$state" != "null" ]]; then
-                    log_debug "通过 OCID 找到实例（状态: $state）"
+                    log_debug "通过 OCID 找到实例（状态: ${state}）"
                     echo "$ocid"
                     return 0
                 fi
@@ -327,12 +327,12 @@ verify_and_update_state() {
             A1_VERIFIED=true
             if ! record_instance_verification "${A1_FLEX_CONFIG[DISPLAY_NAME]}" "$a1_instance_id" "verified" "$state_file"; then
                 log_warning "记录 A1.Flex 实例验证失败"
-                ((verification_errors++))
+                ((verification_errors += 1))
             fi
         else
             log_warning "A1.Flex 实例创建报告成功但 API 未找到实例 - 降级为容量错误"
             A1_VERIFIED=false
-            ((verification_errors++))
+            ((verification_errors += 1))
         fi
     fi
     
@@ -346,12 +346,12 @@ verify_and_update_state() {
             E2_VERIFIED=true
             if ! record_instance_verification "${E2_MICRO_CONFIG[DISPLAY_NAME]}" "$e2_instance_id" "verified" "$state_file"; then
                 log_warning "记录 E2.Micro 实例验证失败"
-                ((verification_errors++))
+                ((verification_errors += 1))
             fi
         else
             log_warning "E2.Micro 实例创建报告成功但 API 未找到实例 - 降级为容量错误"
             E2_VERIFIED=false
-            ((verification_errors++))
+            ((verification_errors += 1))
         fi
     fi
     
@@ -448,7 +448,8 @@ main() {
     SHOULD_LAUNCH_E2=true
     
     # Check SKIP_SHAPES environment variable (comma-separated: "E2" or "A1" or "E2,A1")
-    local skip_shapes="${SKIP_SHAPES:-E2}"
+    # Default is A1-only by skipping E2; set SKIP_SHAPES=NONE/ALL/BOTH to try both shapes.
+    local skip_shapes="${SKIP_SHAPES-E2}"
     if [[ -n "$skip_shapes" ]]; then
         IFS=',' read -ra skip_list <<< "$skip_shapes"
         for shape in "${skip_list[@]}"; do
@@ -463,6 +464,9 @@ main() {
                     SHOULD_LAUNCH_A1=false
                     log_info "A1.Flex: 已通过 SKIP_SHAPES 跳过"
                     echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$a1_result"
+                    ;;
+                NONE|ALL|BOTH)
+                    log_info "未通过 SKIP_SHAPES 跳过任何形状"
                     ;;
             esac
         done
@@ -655,7 +659,7 @@ main() {
                 STATUS_A1=$OCI_EXIT_TIMEOUT
                 log_debug "A1 超时已应用（已启动，无特定错误码）"
             else
-                log_debug "A1 超时但保留错误码 $STATUS_A1（容量/限额检测）"
+                log_debug "A1 超时但保留错误码 ${STATUS_A1}（容量/限额检测）"
             fi
         else
             log_debug "A1 已因缓存限额跳过 - 无需超时处理"
@@ -667,7 +671,7 @@ main() {
                 STATUS_E2=$OCI_EXIT_TIMEOUT
                 log_debug "E2 超时已应用（已启动，无特定错误码）"
             else
-                log_debug "E2 超时但保留错误码 $STATUS_E2（容量/限额检测）"
+                log_debug "E2 超时但保留错误码 ${STATUS_E2}（容量/限额检测）"
             fi
         else
             log_debug "E2 已因缓存限额跳过 - 无需超时处理"
@@ -886,13 +890,13 @@ $notification_details"
     else
         local failure_summary=""
         if [[ $STATUS_A1 -ne 0 && $STATUS_A1 -ne 2 && $STATUS_A1 -ne 5 && $STATUS_A1 -ne 6 && "$SHOULD_LAUNCH_A1" == true ]]; then
-            failure_summary="A1.Flex 失败（退出码: $STATUS_A1）"
+            failure_summary="A1.Flex 失败（退出码: ${STATUS_A1}）"
         fi
         if [[ $STATUS_E2 -ne 0 && $STATUS_E2 -ne 2 && $STATUS_E2 -ne 5 && $STATUS_E2 -ne 6 && "$SHOULD_LAUNCH_E2" == true ]]; then
             if [[ -n "$failure_summary" ]]; then
-                failure_summary="$failure_summary, E2.1.Micro 失败（退出码: $STATUS_E2）"
+                failure_summary="${failure_summary}, E2.1.Micro 失败（退出码: ${STATUS_E2}）"
             else
-                failure_summary="E2.1.Micro 失败（退出码: $STATUS_E2）"
+                failure_summary="E2.1.Micro 失败（退出码: ${STATUS_E2}）"
             fi
         fi
         

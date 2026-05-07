@@ -5,11 +5,11 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/utils.sh"
-source "$(dirname "$0")/notify.sh"
-source "$(dirname "$0")/metrics.sh"
-source "$(dirname "$0")/circuit-breaker.sh"
-source "$(dirname "$0")/state-manager.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/utils.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/notify.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/metrics.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/circuit-breaker.sh"
+source "$(dirname "${BASH_SOURCE[0]:-$0}")/state-manager.sh"
 
 # Global flag for signal handling
 INTERRUPTED=false
@@ -420,7 +420,7 @@ launch_instance() {
                 # Try next AD if available
                 if [[ $((ad_index + 1)) -lt $max_attempts ]]; then
                     log_info "尝试下一个可用性域..."
-                    ((ad_index++))
+                    ((ad_index += 1))
                     continue
                 else
                     log_performance_metric "AD_CYCLE_COMPLETE" "ALL_ADS" "$max_attempts" "$max_attempts" "CAPACITY_EXHAUSTED"
@@ -452,7 +452,7 @@ launch_instance() {
                 # Try next AD if available
                 if [[ $((ad_index + 1)) -lt $max_attempts ]]; then
                     log_info "LimitExceeded 后尝试下一个可用性域..."
-                    ((ad_index++))
+                    ((ad_index += 1))
                     continue
                 else
                     log_info "LimitExceeded 错误后所有 AD 已穷尽"
@@ -465,7 +465,7 @@ launch_instance() {
                 local should_retry_same_ad=true
                 
                 while [[ $should_retry_same_ad == true && $retry_count -lt $transient_retry_max ]]; do
-                    ((retry_count++))
+                    ((retry_count += 1))
                     
                     # Calculate exponential backoff delay for this attempt
                     local backoff_delay
@@ -516,7 +516,7 @@ launch_instance() {
                 if [[ "$error_type" == "INTERNAL_ERROR" || "$error_type" == "NETWORK" ]]; then
                     if [[ $((ad_index + 1)) -lt $max_attempts ]]; then
                         log_info "$current_ad 的所有重试已穷尽 - 尝试下一个可用性域..."
-                        ((ad_index++))
+                        ((ad_index += 1))
                         continue
                     else
                         # All ADs attempted with transient errors - treat as temporary capacity issue
@@ -529,7 +529,7 @@ launch_instance() {
                         "CAPACITY")
                             if [[ $((ad_index + 1)) -lt $max_attempts ]]; then
                                 log_info "重试期间容量错误后尝试下一个可用性域..."
-                                ((ad_index++))
+                                ((ad_index += 1))
                                 continue
                             else
                                 log_info "所有 AD 已穷尽 - 将在下次调度时重试"
@@ -577,7 +577,7 @@ launch_instance() {
             fi
         fi
         
-        ((ad_index++))
+        ((ad_index += 1))
     done
     
     # Should not reach here, but handle gracefully
@@ -704,7 +704,7 @@ handle_launch_error_with_ad() {
             log_error "AD $current_ad 中实例启动时发生意外错误"
             local error_line
             error_line=$(echo "$error_output" | head -1)
-            send_telegram_notification "error" "OCI 实例启动失败（AD $current_ad）: ${error_line}"
+            send_telegram_notification "error" "OCI 实例启动失败（AD ${current_ad}）: ${error_line}"
             echo "UNKNOWN"
             return 0
             ;;
@@ -759,7 +759,7 @@ verify_instance_creation() {
                 --query 'data."lifecycle-state"' \
                 --raw-output || echo "")
             
-            log_success "找到实例: $instance_id（状态: $state）"
+            log_success "找到实例: ${instance_id}（状态: ${state}）"
             
             # Record instance creation in state cache
             if [[ "${CACHE_ENABLED:-true}" == "true" ]]; then

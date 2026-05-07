@@ -285,10 +285,10 @@ redact_sensitive_params() {
         # Check if this is a parameter that might contain sensitive data
         if [[ "$param" == "--auth" || "$param" == "--private-key" || "$param" == "--key-file" ]]; then
             redacted_cmd+=("$param")
-            ((i++))
+            ((i += 1))
             if [[ $i -lt ${#cmd[@]} ]]; then
                 redacted_cmd+=("[REDACTED]")
-                ((i++))
+                ((i += 1))
             fi
         elif [[ "$param" =~ ^ocid1\. ]]; then
             # Redact OCIDs by showing only first and last 4 characters
@@ -299,24 +299,24 @@ redact_sensitive_params() {
             else
                 redacted_cmd+=("[REDACTED]")
             fi
-            ((i++))
+            ((i += 1))
         elif [[ "$param" =~ (BEGIN|END).*PRIVATE.*KEY ]]; then
             # Redact private key content
             redacted_cmd+=("[PRIVATE_KEY_REDACTED]")
-            ((i++))
+            ((i += 1))
         elif [[ "$param" =~ .*@.*:.* ]]; then
             # Mask proxy URLs or credentials in the format user:pass@host:port
             local masked_param
             masked_param=$(mask_credentials "$param")
             redacted_cmd+=("$masked_param")
-            ((i++))
+            ((i += 1))
         elif [[ "$param" =~ --metadata.*ssh-authorized-keys || "$param" =~ ssh-rsa || "$param" =~ ssh-ed25519 ]]; then
             # Redact SSH keys
             redacted_cmd+=("[SSH_KEY_REDACTED]")
-            ((i++))
+            ((i += 1))
         else
             redacted_cmd+=("$param")
-            ((i++))
+            ((i += 1))
         fi
     done
     
@@ -522,8 +522,8 @@ get_error_type() {
         echo "USER_LIMIT_REACHED"
     # Check for Oracle capacity unavailable errors (specific Oracle capacity constraints)
     elif echo "$error_output" | grep -qi "out of host capacity\|insufficient.*host.*capacity\|host.*capacity.*unavailable\|\"code\".*\"InternalError\".*host.*capacity"; then
-        log_debug "检测到 ORACLE_CAPACITY_UNAVAILABLE 错误模式: $error_output"
-        echo "ORACLE_CAPACITY_UNAVAILABLE"
+        log_debug "检测到 CAPACITY 错误模式: $error_output"
+        echo "CAPACITY"
     # Check for general limit exceeded errors (fallback for other limit types)
     elif echo "$error_output" | grep -qi "limitexceeded\|\"code\".*\"LimitExceeded\""; then
         log_debug "检测到 LIMIT_EXCEEDED 错误模式: $error_output"
@@ -575,6 +575,27 @@ calculate_exponential_backoff() {
     local attempt="$1"
     local base_delay="${2:-5}"
     local max_delay="${3:-40}"
+
+    if ! [[ "$attempt" =~ ^[0-9]+$ ]]; then
+        attempt=1
+    fi
+
+    if ! [[ "$base_delay" =~ ^[0-9]+$ ]]; then
+        base_delay=5
+    fi
+
+    if ! [[ "$max_delay" =~ ^[0-9]+$ ]]; then
+        max_delay=40
+    fi
+
+    if [[ $max_delay -lt $base_delay ]]; then
+        max_delay="$base_delay"
+    fi
+
+    if [[ $attempt -le 1 ]]; then
+        echo "$base_delay"
+        return
+    fi
     
     if [[ $attempt -gt 20 ]]; then
         echo "$max_delay"
@@ -611,7 +632,7 @@ retry_with_backoff() {
             delay=$((delay * 2))  # Exponential backoff
         fi
         
-        ((attempt++))
+        ((attempt += 1))
     done
     
     log_error "命令在 $max_attempts 次尝试后失败"
@@ -635,19 +656,21 @@ retry_with_backoff() {
 wait_for_result_file() {
     local file_path="$1"
     local timeout="${2:-$RESULT_FILE_WAIT_TIMEOUT}"
-    local elapsed=0
     local poll_interval="$RESULT_FILE_POLL_INTERVAL"
+    local checks=0
+    local max_checks
+    max_checks=$(awk -v timeout="$timeout" -v interval="$poll_interval" 'BEGIN { printf "%d", (timeout / interval) + 0.999 }' 2>/dev/null || echo "$timeout")
     
     log_debug "等待结果文件: $file_path (超时: ${timeout}s)"
     
-    while [[ $elapsed -lt $timeout ]]; do
+    while [[ $checks -lt $max_checks ]]; do
         if [[ -f "$file_path" ]]; then
             # File exists, check if it has content
             local file_content
             if file_content=$(cat "$file_path" 2>/dev/null) && [[ -n "$file_content" ]]; then
                 # Validate content is a valid exit code (numeric)
                 if [[ "$file_content" =~ ^[0-9]+$ ]]; then
-                    log_debug "结果文件找到，有效退出码 '$file_content'，等待 ${elapsed}s"
+                    log_debug "结果文件找到，有效退出码 '$file_content'"
                     return 0
                 else
                     log_debug "结果文件内容非数字: '$file_content'"
@@ -655,7 +678,7 @@ wait_for_result_file() {
             fi
         fi
         sleep "$poll_interval"
-        elapsed=$((elapsed + poll_interval))
+        ((checks += 1))
     done
     
     # Final check - log file state for debugging
@@ -1010,7 +1033,7 @@ detach_boot_volume_if_attached() {
             return 0
         fi
         
-        log_debug "引导卷状态: $state，等待 ${wait_interval}s..."
+        log_debug "引导卷状态: ${state}，等待 ${wait_interval}s..."
         sleep "$wait_interval"
         elapsed=$((elapsed + wait_interval))
     done
@@ -1035,7 +1058,7 @@ terminate_instance_and_preserve_boot_volume() {
         log_info "找到实例 $instance_id 的引导卷: $boot_volume_id"
     fi
     
-    log_info "正在终止实例: $instance_id（保留引导卷）"
+    log_info "正在终止实例: ${instance_id}（保留引导卷）"
     
     local terminate_output
     terminate_output=$(oci_cmd compute instance terminate \
@@ -1069,7 +1092,7 @@ terminate_instance_and_preserve_boot_volume() {
             return 0
         fi
         
-        log_debug "实例状态: $state，等待 ${wait_interval}s..."
+        log_debug "实例状态: ${state}，等待 ${wait_interval}s..."
         sleep "$wait_interval"
         elapsed=$((elapsed + wait_interval))
     done
@@ -1428,4 +1451,3 @@ record_failure_pattern() {
         fi
     fi
 }
-

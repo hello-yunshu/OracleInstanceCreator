@@ -48,19 +48,19 @@ test_regional_patterns() {
     
     # Test Singapore pattern
     local singapore_pattern=$(get_regional_pattern "ap-singapore-1")
-    assert_equal "SGT|UTC+8|10am-3pm weekdays low usage" "$singapore_pattern" "Singapore regional pattern"
+    assert_equal "SGT|UTC+8|10am-3pm 工作日低使用率" "$singapore_pattern" "Singapore regional pattern"
     
     # Test US East pattern
-    local us_east_pattern=$(get_regional_pattern "us-east-1")
-    assert_equal "EST|UTC-5|2am-7am ET low usage" "$us_east_pattern" "US East regional pattern"
+    local us_east_pattern=$(get_regional_pattern "us-ashburn-1")
+    assert_equal "EST|UTC-5|2am-7am ET 低使用率" "$us_east_pattern" "US East regional pattern"
     
     # Test Europe pattern
     local eu_pattern=$(get_regional_pattern "eu-frankfurt-1")
-    assert_equal "CET|UTC+1|8am-1pm CET low usage" "$eu_pattern" "EU Frankfurt regional pattern"
+    assert_equal "CET|UTC+1|8am-1pm CET 低使用率" "$eu_pattern" "EU Frankfurt regional pattern"
     
     # Test default fallback
     local unknown_pattern=$(get_regional_pattern "unknown-region")
-    assert_equal "SGT|UTC+8|10am-3pm weekdays low usage" "$unknown_pattern" "Unknown region defaults to Singapore"
+    assert_equal "PST|UTC-8|5am-10am PT 低使用率" "$unknown_pattern" "Unknown region defaults to US West"
 }
 
 # Test 2: Timezone calculations validation
@@ -196,9 +196,9 @@ test_github_actions_cron_format() {
     local weekend_cron="*/20 1-6 * * 6,0"
     
     # Basic format validation (5 fields)
-    local field_count_aggressive=$(echo "$aggressive_cron" | wc -w)
-    local field_count_conservative=$(echo "$conservative_cron" | wc -w)
-    local field_count_weekend=$(echo "$weekend_cron" | wc -w)
+    local field_count_aggressive=$(echo "$aggressive_cron" | wc -w | tr -d '[:space:]')
+    local field_count_conservative=$(echo "$conservative_cron" | wc -w | tr -d '[:space:]')
+    local field_count_weekend=$(echo "$weekend_cron" | wc -w | tr -d '[:space:]')
     
     assert_equal "5" "$field_count_aggressive" "Aggressive cron has 5 fields"
     assert_equal "5" "$field_count_conservative" "Conservative cron has 5 fields"

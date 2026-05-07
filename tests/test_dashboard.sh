@@ -14,7 +14,7 @@ source "$SCRIPT_DIR/test_utils.sh"
 
 # Dashboard paths
 DASHBOARD_DIR="$PROJECT_ROOT/docs/dashboard"
-HTML_FILES=("$DASHBOARD_DIR/index.html" "$DASHBOARD_DIR/test-dashboard.html")
+HTML_FILES=("$DASHBOARD_DIR/index.html")
 JS_FILES=("$DASHBOARD_DIR/js/dashboard.js")
 CSS_FILES=("$DASHBOARD_DIR/css/dashboard.css")
 
@@ -119,7 +119,7 @@ test_cdn_dependencies() {
             # Find CDN URLs (https://cdn.* or https://cdnjs.*)
             while IFS= read -r url; do
                 cdn_urls+=("$url")
-            done < <(grep -oP 'https://cdn[^"]*|https://cdnjs[^"]*' "$html_file" 2>/dev/null || true)
+            done < <(grep -Eo 'https://cdn[^"]*|https://cdnjs[^"]*' "$html_file" 2>/dev/null || true)
         fi
     done
     
@@ -146,7 +146,7 @@ test_cdn_dependencies() {
     local non_https_count=0
     for url in "${cdn_urls[@]}"; do
         if [[ ! "$url" =~ ^https:// ]]; then
-            ((non_https_count++))
+            ((non_https_count += 1))
         fi
     done
     
@@ -243,7 +243,7 @@ test_accessibility_basics() {
             fi
             
             # Test for semantic HTML elements
-            if grep -qE "<(header|nav|main|section|article|aside|footer)>" "$html_file"; then
+            if grep -qE "<(header|nav|main|section|article|aside|footer)([[:space:]>])" "$html_file"; then
                 assert_equal "semantic" "semantic" "Semantic HTML elements found in $filename"
             else
                 assert_equal "semantic" "non_semantic" "Consider adding semantic HTML elements in $filename"
@@ -275,7 +275,7 @@ test_performance_indicators() {
             fi
             
             # Test for font-display optimization
-            if grep -q "font-display" "$html_file"; then
+            if grep -qE "font-display|display=swap" "$html_file"; then
                 assert_equal "font_optimization" "font_optimization" "Font display optimization in $filename"
             else
                 assert_equal "font_optimization" "basic" "Basic font loading in $filename"
@@ -385,7 +385,7 @@ test_cdn_reachability() {
     local reachable_count=0
     for url in "${test_urls[@]}"; do
         if test_url_reachable "$url" 3; then
-            ((reachable_count++))
+            ((reachable_count += 1))
             echo -e "${GREEN}✓${NC} $url reachable"
         else
             echo -e "${YELLOW}⚠${NC} $url not reachable (offline or blocked)"

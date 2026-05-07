@@ -166,7 +166,7 @@ EOF
             break
         fi
         sleep 1
-        ((elapsed++))
+        ((elapsed += 1))
     done
     
     # Check results
@@ -177,14 +177,14 @@ EOF
     if [[ -f "$temp_dir/a1_result" ]] && [[ -f "$temp_dir/e2_result" ]]; then
         if [[ $execution_time -le 5 ]]; then
             echo "✅ PASS: $test_name (${execution_time}s)"
-            ((TESTS_PASSED++))
+            ((TESTS_PASSED += 1))
         else
             echo "❌ FAIL: $test_name - Too slow (${execution_time}s > 5s)"
-            ((TESTS_FAILED++))
+            ((TESTS_FAILED += 1))
         fi
     else
         echo "❌ FAIL: $test_name - Missing result files"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     # Cleanup
@@ -229,7 +229,7 @@ EOF
             break
         fi
         sleep 1
-        ((elapsed++))
+        ((elapsed += 1))
     done
     
     # Handle timeout
@@ -247,10 +247,10 @@ EOF
     
     if [[ "$timed_out" == "true" ]] && [[ $execution_time -le 6 ]]; then
         echo "✅ PASS: $test_name (${execution_time}s)"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "❌ FAIL: $test_name - Timeout not properly handled"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     rm -rf "$temp_dir"
@@ -267,11 +267,13 @@ test_parallel_signal_handling() {
     trap 'rm -rf "$temp_dir"' EXIT
     
     # Create script that handles signals
-    cat > "$temp_dir/mock_signal_instance.sh" << EOF
+cat > "$temp_dir/mock_signal_instance.sh" << EOF
 #!/bin/bash
 
+result_dir="\$1"
+
 cleanup() {
-    echo "CLEANUP_CALLED" > "\$1/cleanup_marker"
+    echo "CLEANUP_CALLED" > "\$result_dir/cleanup_marker"
     exit 130
 }
 
@@ -281,7 +283,7 @@ trap cleanup SIGTERM SIGINT
 sleep 10 &
 wait \$!
 
-echo "SUCCESS:ocid1.instance.test" > "\$1/result"
+echo "SUCCESS:ocid1.instance.test" > "\$result_dir/result"
 exit 0
 EOF
     
@@ -300,10 +302,10 @@ EOF
     
     if [[ -f "$temp_dir/cleanup_marker" ]]; then
         echo "✅ PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "❌ FAIL: $test_name - Signal not properly handled"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     kill -9 $pid 2>/dev/null || true
@@ -360,14 +362,14 @@ EOF
         
         if [[ "$a1_content" == A1_SUCCESS:* ]] && [[ "$e2_content" == E2_SUCCESS:* ]]; then
             echo "✅ PASS: $test_name"
-            ((TESTS_PASSED++))
+            ((TESTS_PASSED += 1))
         else
             echo "❌ FAIL: $test_name - Incorrect file content"
-            ((TESTS_FAILED++))
+            ((TESTS_FAILED += 1))
         fi
     else
         echo "❌ FAIL: $test_name - Missing result files"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     rm -rf "$temp_dir"
@@ -425,10 +427,10 @@ EOF
     
     if [[ $final_files -le $initial_files ]]; then
         echo "✅ PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "❌ FAIL: $test_name - Resource cleanup failed"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
     
     kill -9 $pid 2>/dev/null || true

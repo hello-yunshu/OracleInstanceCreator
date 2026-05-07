@@ -53,26 +53,38 @@ start_test_section() {
 assert_success() {
     local test_name="$1"
     local command="$2"
+    local status
     
-    if eval "$command" >/dev/null 2>&1; then
+    set +e
+    eval "$command" >/dev/null 2>&1
+    status=$?
+    set -e
+
+    if [[ $status -eq 0 ]]; then
         echo "✓ $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "✗ $test_name (command failed: $command)"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
 assert_failure() {
     local test_name="$1"
     local command="$2"
+    local status
     
-    if eval "$command" >/dev/null 2>&1; then
+    set +e
+    eval "$command" >/dev/null 2>&1
+    status=$?
+    set -e
+
+    if [[ $status -eq 0 ]]; then
         echo "✗ $test_name (expected failure but command succeeded: $command)"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     else
         echo "✓ $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     fi
 }
 
@@ -82,10 +94,10 @@ assert_file_exists() {
     
     if [[ -f "$file_path" ]]; then
         echo "✓ $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "✗ $test_name (file not found: $file_path)"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -95,10 +107,10 @@ assert_json_valid() {
     
     if [[ -f "$file_path" ]] && jq empty "$file_path" 2>/dev/null; then
         echo "✓ $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "✗ $test_name (invalid JSON: $file_path)"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -109,10 +121,10 @@ assert_contains() {
     
     if [[ -f "$file_path" ]] && grep -q "$expected_content" "$file_path" 2>/dev/null; then
         echo "✓ $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED += 1))
     else
         echo "✗ $test_name (content not found: $expected_content)"
-        ((TESTS_FAILED++))
+        ((TESTS_FAILED += 1))
     fi
 }
 
@@ -169,13 +181,13 @@ test_cache_key_generation() {
     # Test cache key with fixed date
     local cache_key
     cache_key=$(generate_cache_key)
-    assert_success "Generate cache key" "[[ '$cache_key' == 'oci-instances-ap-singapore-1-v1-2024-01-15' ]]"
+    assert_success "Generate cache key" "[[ '$cache_key' =~ ^oci-instances-[a-f0-9]{8}-v1-2024-01-15$ ]]"
     
     # Test cache key with different region
     export OCI_REGION="us-ashburn-1"
     local cache_key_us
     cache_key_us=$(generate_cache_key)
-    assert_success "Generate cache key for different region" "[[ '$cache_key_us' == 'oci-instances-us-ashburn-1-v1-2024-01-15' ]]"
+    assert_success "Generate cache key for different region" "[[ '$cache_key_us' =~ ^oci-instances-[a-f0-9]{8}-v1-2024-01-15$ && '$cache_key_us' != '$cache_key' ]]"
     
     # Reset region
     export OCI_REGION="ap-singapore-1"
@@ -276,28 +288,20 @@ test_enhanced_verification() {
 test_cli_interface() {
     start_test_section "CLI Interface"
     
-    # Create a temporary script wrapper for CLI testing
-    local cli_script="$TEST_STATE_DIR/cli_test.sh"
-    cat > "$cli_script" << 'EOF'
-#!/bin/bash
-cd "$(dirname "$0")/.."
-export CACHE_PATH="$PWD/.cache/oci-state"
-export STATE_FILE_NAME="test-instance-state.json"
-scripts/state-manager.sh "$@"
-EOF
-    chmod +x "$cli_script"
+    local cli_env
+    cli_env="CACHE_PATH='$TEST_CACHE_DIR' OCI_REGION='ap-singapore-1' CACHE_ENABLED='true' CACHE_TTL_HOURS='24'"
     
     # Test CLI initialization
-    assert_success "CLI init command" "cd '$PROJECT_DIR' && '$cli_script' init"
+    assert_success "CLI init command" "env $cli_env '$PROJECT_DIR/scripts/state-manager.sh' init"
     
     # Test CLI health check
-    assert_success "CLI health command" "cd '$PROJECT_DIR' && '$cli_script' health"
+    assert_success "CLI health command" "env $cli_env '$PROJECT_DIR/scripts/state-manager.sh' health"
     
     # Test CLI stats (will show no stats initially)
-    assert_success "CLI stats command" "cd '$PROJECT_DIR' && '$cli_script' stats || true"  # Allow failure if no stats
+    assert_success "CLI stats command" "env $cli_env '$PROJECT_DIR/scripts/state-manager.sh' stats || true"  # Allow failure if no stats
     
     # Test CLI print
-    assert_success "CLI print command" "cd '$PROJECT_DIR' && '$cli_script' print"
+    assert_success "CLI print command" "env $cli_env '$PROJECT_DIR/scripts/state-manager.sh' print"
 }
 
 test_error_propagation() {

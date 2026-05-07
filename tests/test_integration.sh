@@ -252,7 +252,6 @@ test_signal_handling() {
         rm -f "$temp_file" 2>/dev/null || true
     }
     
-    trap cleanup_handler EXIT
     cleanup_handler  # Manually trigger for test
     
     assert_file_exists "$temp_file.cleanup"
@@ -341,7 +340,7 @@ test_concurrent_execution_stress() {
             e2_status=$(cat "$e2_result" 2>/dev/null || echo "1")
             
             if [[ "$a1_status" == "0" && "$e2_status" == "0" ]]; then
-                ((success_count++))
+                ((success_count += 1))
             fi
         fi
         

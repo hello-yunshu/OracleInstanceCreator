@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com; connect-src 'self' https://api.github.com;">
     <title>Oracle Instance Creator Dashboard</title>
+    <link rel="preload" href="css/dashboard.css" as="style">
     <link rel="stylesheet" href="css/dashboard.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -136,7 +137,7 @@
                     <div class="data-header">
                         <h3><i class="fas fa-history"></i> Recent Workflow Runs</h3>
                         <div class="data-controls">
-                            <button id="refresh-runs" class="btn-icon">
+                            <button id="refresh-runs" class="btn-icon" aria-label="Refresh workflow runs">
                                 <i class="fas fa-sync-alt"></i>
                             </button>
                         </div>
@@ -251,7 +252,7 @@
                 <form id="settings-form">
                     <div class="form-group">
                         <label for="github-token">GitHub Personal Access Token:</label>
-                        <input type="password" id="github-token" placeholder="ghp_xxxxxxxxxxxx">
+                        <input type="password" id="github-token" placeholder="GitHub token">
                         <small>Required for workflow controls and private repository access</small>
                     </div>
                     <div class="form-group">
@@ -277,7 +278,7 @@
     </div>
 
     <!-- Settings Button -->
-    <button id="settings-btn" class="floating-btn" title="Settings">
+    <button id="settings-btn" class="floating-btn" title="Settings" aria-label="Settings">
         <i class="fas fa-cog"></i>
     </button>
 
