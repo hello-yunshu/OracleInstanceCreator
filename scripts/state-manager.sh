@@ -154,6 +154,7 @@ with_state_lock() {
         local old_exit_trap old_err_trap
         old_exit_trap=$(trap -p EXIT)
         old_err_trap=$(trap -p ERR)
+        # shellcheck disable=SC2064
         trap "release_state_lock '$state_file'" EXIT ERR
         "$func_name" "$state_file" "$@"
         local result=$?
