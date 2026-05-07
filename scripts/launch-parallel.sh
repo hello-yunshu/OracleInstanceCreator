@@ -475,26 +475,30 @@ main() {
     init_state_manager "$state_file" >/dev/null
     if [[ $? -eq 0 ]]; then
         # Check A1.Flex limit state
-        if get_cached_limit_state "${A1_FLEX_CONFIG[SHAPE]}" "$state_file"; then
-            SHOULD_LAUNCH_A1=false
-            log_info "A1.Flex: 缓存限额已达 - 跳过创建尝试"
-            echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$a1_result"
-        else
-            log_debug "A1.Flex: 无缓存限额 - 继续创建尝试"
+        if [[ "$SHOULD_LAUNCH_A1" == true ]]; then
+            if get_cached_limit_state "${A1_FLEX_CONFIG[SHAPE]}" "$state_file"; then
+                SHOULD_LAUNCH_A1=false
+                log_info "A1.Flex: 缓存限额已达 - 跳过创建尝试"
+                echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$a1_result"
+            else
+                log_debug "A1.Flex: 无缓存限额 - 继续创建尝试"
+            fi
         fi
         
-        # Check E2.Micro limit state  
-        if get_cached_limit_state "${E2_MICRO_CONFIG[SHAPE]}" "$state_file"; then
-            SHOULD_LAUNCH_E2=false
-            log_info "E2.1.Micro: 缓存限额已达 - 跳过创建尝试"
-            echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$e2_result"
-        else
-            log_debug "E2.1.Micro: 无缓存限额 - 继续创建尝试"
+        # Check E2.Micro limit state
+        if [[ "$SHOULD_LAUNCH_E2" == true ]]; then
+            if get_cached_limit_state "${E2_MICRO_CONFIG[SHAPE]}" "$state_file"; then
+                SHOULD_LAUNCH_E2=false
+                log_info "E2.1.Micro: 缓存限额已达 - 跳过创建尝试"
+                echo "$OCI_EXIT_USER_LIMIT_ERROR" >"$e2_result"
+            else
+                log_debug "E2.1.Micro: 无缓存限额 - 继续创建尝试"
+            fi
         fi
         
         # Early exit if both shapes are at cached limits
         if [[ "$SHOULD_LAUNCH_A1" == false && "$SHOULD_LAUNCH_E2" == false ]]; then
-            log_info "两种形状均达缓存限额 - 无需创建尝试"
+            log_info "所有启用的形状均已跳过或达缓存限额 - 无需创建尝试"
             log_info "请考虑管理现有实例以释放容量，或等待限额缓存过期"
             # Clean up temporary files
             rm -rf "$temp_dir" 2>/dev/null || true

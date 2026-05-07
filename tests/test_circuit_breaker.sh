@@ -91,6 +91,7 @@ setup_test() {
 
 cleanup_test() {
     # Clean up after each test
+    unset OCI_AD
     reset_all_ad_failures >/dev/null 2>&1 || true
     [[ "$TEST_ASSERTION_FAILED" -eq 0 ]]
 }
@@ -275,6 +276,27 @@ test_all_ads_filtered() {
     cleanup_test
 }
 
+test_single_ad_not_filtered() {
+    setup_test
+
+    local input_ads="$TEST_AD_1"
+    export OCI_AD="$input_ads"
+
+    increment_ad_failure "$TEST_AD_1" >/dev/null 2>&1
+    increment_ad_failure "$TEST_AD_1" >/dev/null 2>&1
+    increment_ad_failure "$TEST_AD_1" >/dev/null 2>&1
+
+    local available_ads
+    available_ads=$(get_available_ads "$input_ads")
+    assert_equals "$input_ads" "$available_ads" "Single AD should not be filtered by circuit breaker"
+
+    local count
+    count=$(get_ad_failure_count "$TEST_AD_1")
+    assert_equals "0" "$count" "Single AD failures should not be tracked for circuit breaking"
+
+    cleanup_test
+}
+
 # Mock GitHub CLI for testing (if not available)
 if ! command -v gh >/dev/null 2>&1; then
     echo "WARNING: GitHub CLI not available - some persistence tests will be skipped"
@@ -310,6 +332,7 @@ run_test "success reset" test_success_reset
 run_test "multiple ADs" test_multiple_ads
 run_test "get available ADs" test_get_available_ads
 run_test "all ADs filtered" test_all_ads_filtered
+run_test "single AD not filtered" test_single_ad_not_filtered
 
 # Test summary
 echo

@@ -46,6 +46,19 @@ _save_failure_data() {
     return 1
 }
 
+count_configured_ads() {
+    local input_ads="$1"
+    local count=0
+
+    IFS=',' read -ra ad_array <<< "$input_ads"
+    for ad in "${ad_array[@]}"; do
+        ad=$(echo "$ad" | xargs)
+        [[ -n "$ad" ]] && count=$((count + 1))
+    done
+
+    echo "$count"
+}
+
 get_ad_failure_count() {
     local ad="$1"
     local failure_data
@@ -119,6 +132,11 @@ increment_ad_failure() {
     local failure_data
     local updated_data
     local current_time
+
+    if [[ -n "${OCI_AD:-}" && "$(count_configured_ads "$OCI_AD")" -le 1 ]]; then
+        log_debug "单 AD 配置 - 不记录熔断失败: $ad"
+        return 0
+    fi
     
     current_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u)
     failure_data=$(get_ad_failure_data)
@@ -170,6 +188,14 @@ reset_all_ad_failures() {
 get_available_ads() {
     local input_ads="$1"
     local available_ads=""
+    local ad_count
+
+    ad_count=$(count_configured_ads "$input_ads")
+    if [[ "$ad_count" -le 1 ]]; then
+        log_debug "单 AD 配置 - 跳过熔断器过滤"
+        echo "$input_ads"
+        return 0
+    fi
     
     IFS=',' read -ra ad_array <<< "$input_ads"
     
@@ -217,6 +243,7 @@ show_circuit_breaker_status() {
     fi
 }
 
+export -f count_configured_ads
 export -f should_skip_ad
 export -f increment_ad_failure
 export -f mark_ad_success
