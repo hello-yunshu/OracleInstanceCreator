@@ -48,11 +48,11 @@ validate_instance_configuration() {
     log_info "正在验证实例配置..."
     
     # Required instance configuration with defaults
-    export OCI_AD="${OCI_AD:-fgaj:AP-SINGAPORE-1-AD-1}"
+    export OCI_AD="${OCI_AD:-AxQf:US-SANJOSE-1-AD-1}"
     export OCI_SHAPE="${OCI_SHAPE:-VM.Standard.A1.Flex}"
     export INSTANCE_DISPLAY_NAME="${INSTANCE_DISPLAY_NAME:-oci-free-instance}"
-    export OPERATING_SYSTEM="${OPERATING_SYSTEM:-Oracle Linux}"
-    export OS_VERSION="${OS_VERSION:-10}"
+    export OPERATING_SYSTEM="${OPERATING_SYSTEM:-Canonical Ubuntu}"
+    export OS_VERSION="${OS_VERSION:-24.04}"
     export ASSIGN_PUBLIC_IP="${ASSIGN_PUBLIC_IP:-true}"
     
     # New configuration options with defaults
@@ -86,8 +86,8 @@ validate_instance_configuration() {
     
     # Flexible shape configuration
     if [[ "$OCI_SHAPE" == *"Flex" ]]; then
-        export OCI_OCPUS="${OCI_OCPUS:-4}"
-        export OCI_MEMORY_IN_GBS="${OCI_MEMORY_IN_GBS:-24}"
+        export OCI_OCPUS="${OCI_OCPUS:-1}"
+        export OCI_MEMORY_IN_GBS="${OCI_MEMORY_IN_GBS:-6}"
         
         # Validate numeric values
         if ! [[ "$OCI_OCPUS" =~ ^[0-9]+$ ]] || [[ "$OCI_OCPUS" -le 0 ]]; then

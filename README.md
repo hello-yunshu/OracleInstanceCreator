@@ -54,11 +54,13 @@
 | `OCI_COMPARTMENT_ID` | ❌ | 隔离舱 OCID（默认使用租户 OCID） |
 | `OCI_IMAGE_ID` | ❌ | 自定义镜像 OCID（默认自动查询最新镜像） |
 | `OCI_PROXY_URL` | ❌ | 代理 URL（支持 IPv4/IPv6） |
-| `OCI_AD` | ❌ | 可用域（默认 `fgaj:AP-SINGAPORE-1-AD-1`） |
-| `OCI_REGION_TIMEZONE` | ❌ | 区域时区（默认 `Asia/Singapore`） |
+| `OCI_AD` | ❌ | 可用域（默认 `AxQf:US-SANJOSE-1-AD-1`） |
+| `OCI_REGION_TIMEZONE` | ❌ | 区域时区（默认 `America/Los_Angeles`） |
 | `OCI_BOOT_VOLUME_ID` | ❌ | 通用引导卷 OCID（形状专用 ID 未设置时回退使用） |
 | `OCI_A1_BOOT_VOLUME_ID` | ❌ | A1.Flex 专用引导卷 OCID（优先于通用 ID） |
 | `OCI_E2_BOOT_VOLUME_ID` | ❌ | E2.Micro 专用引导卷 OCID（优先于通用 ID） |
+| `OCI_CACHED_UBUNTU_2404_ARM_IMAGE` | ❌ | Ubuntu 24.04 ARM 镜像缓存 OCID（区域专用） |
+| `OCI_CACHED_UBUNTU_2404_AMD_IMAGE` | ❌ | Ubuntu 24.04 AMD 镜像缓存 OCID（区域专用） |
 | `SKIP_SHAPES` | ❌ | 跳过指定形状（默认 `E2` 只申请 A1；设为 `A1` 只申请 E2；设为 `NONE`/`ALL` 申请全部） |
 
 ### 3. 启用 GitHub Actions
@@ -213,8 +215,10 @@ https://<你的 GitHub 用户名>.github.io/OracleInstanceCreator/
 | `OCI_REGION` | `us-sanjose-1` |
 | `OCI_AD` | `AxQf:US-SANJOSE-1-AD-1` |
 | `OCI_REGION_TIMEZONE` | `America/Los_Angeles` |
+| `OCI_CACHED_UBUNTU_2404_ARM_IMAGE` | `ocid1.image.oc1.us-sanjose-1.aaaaaaaa3bhtihetcgdkvl2srbvm23l5guf5wlmtq3toyht2l6kcuxqa2adq` |
+| `OCI_CACHED_UBUNTU_2404_AMD_IMAGE` | `ocid1.image.oc1.us-sanjose-1.aaaaaaaavoalqgvm37waj5ehczi36mljok5mkv34n2a3ektkdt2wpup6hkwa` |
 
-> **注意**：缓存镜像 ID 是区域专用的。切换区域时，将 `OCI_CACHED_OL10_ARM_IMAGE` 和 `OCI_CACHED_OL10_AMD_IMAGE` 留空，脚本会自动查询对应区域的最新镜像。
+> **注意**：缓存镜像 ID 是区域专用的。切换区域时，将缓存镜像 Secret 留空，脚本会自动查询对应区域的最新镜像。
 
 ### 引导卷迁移
 

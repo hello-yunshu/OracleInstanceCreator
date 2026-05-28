@@ -47,7 +47,7 @@ All secrets must be configured in your GitHub repository settings:
 | `OCI_USER_OCID` | Your OCI user OCID | `ocid1.user.oc1..aaaa...` |
 | `OCI_KEY_FINGERPRINT` | API key fingerprint | `12:34:56:78:90:ab:cd:ef...` |
 | `OCI_TENANCY_OCID` | Your OCI tenancy OCID | `ocid1.tenancy.oc1..aaaa...` |
-| `OCI_REGION` | OCI region identifier | `ap-singapore-1` |
+| `OCI_REGION` | OCI region identifier | `us-sanjose-1` |
 | `OCI_PRIVATE_KEY` | Private API key content | `-----BEGIN RSA PRIVATE KEY-----...` |
 | `OCI_SUBNET_ID` | Target subnet OCID | `ocid1.subnet.oc1..aaaa...` |
 | `INSTANCE_SSH_PUBLIC_KEY` | SSH public key for access | `ssh-rsa AAAA...` |
@@ -60,6 +60,8 @@ All secrets must be configured in your GitHub repository settings:
 |-------------|-------------|---------|
 | `OCI_COMPARTMENT_ID` | Target compartment OCID | Uses tenancy OCID |
 | `OCI_IMAGE_ID` | Specific image OCID | Auto-discovered |
+| `OCI_CACHED_UBUNTU_2404_ARM_IMAGE` | Ubuntu 24.04 ARM image cache OCID | Region-specific |
+| `OCI_CACHED_UBUNTU_2404_AMD_IMAGE` | Ubuntu 24.04 AMD image cache OCID | Region-specific |
 
 ### Environment Variables
 
@@ -67,14 +69,14 @@ These can be set in the GitHub Actions workflow file:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OCI_AD` | Availability domain | `fgaj:AP-SINGAPORE-1-AD-1` |
+| `OCI_AD` | Availability domain | `AxQf:US-SANJOSE-1-AD-1` |
 | `OCI_SHAPE` | Instance shape | `VM.Standard.A1.Flex` |
-| `OCI_OCPUS` | Number of OCPUs (flexible shapes) | `4` |
-| `OCI_MEMORY_IN_GBS` | Memory in GB (flexible shapes) | `24` |
-| `INSTANCE_DISPLAY_NAME` | Instance display name | `a1-sg` |
+| `OCI_OCPUS` | Number of OCPUs (flexible shapes) | `1` |
+| `OCI_MEMORY_IN_GBS` | Memory in GB (flexible shapes) | `6` |
+| `INSTANCE_DISPLAY_NAME` | Instance display name | `default-instance` |
 | `ASSIGN_PUBLIC_IP` | Assign public IP | `true` |
-| `OPERATING_SYSTEM` | Operating system | `Oracle Linux` |
-| `OS_VERSION` | OS version | `10` |
+| `OPERATING_SYSTEM` | Operating system | `Canonical Ubuntu` |
+| `OS_VERSION` | OS version | `24.04` |
 
 ## Using Instance Profiles
 

@@ -36,6 +36,7 @@ run_test_suite() {
 run_test_suite "Circuit Breaker Tests" "test_circuit_breaker.sh"
 run_test_suite "Exponential Backoff Tests" "test_exponential_backoff.sh"
 run_test_suite "State Manager Tests" "test_state_manager.sh"
+run_test_suite "Image Cache Tests" "test_image_cache.sh"
 
 # Summary
 echo "=== Test Suite Summary ==="

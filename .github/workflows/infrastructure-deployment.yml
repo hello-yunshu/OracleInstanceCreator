@@ -95,21 +95,22 @@ jobs:
       # 圣何塞: "AxQf:US-SANJOSE-1-AD-1"
       # 阿什本: "oGHu:US-ASHBURN-1-AD-1,oGHu:US-ASHBURN-1-AD-2,oGHu:US-ASHBURN-1-AD-3"
       # 也可通过 Secret OCI_AD 覆盖
-      OCI_AD: ${{ secrets.OCI_AD || 'fgaj:AP-SINGAPORE-1-AD-1' }}
+      OCI_AD: ${{ secrets.OCI_AD || 'AxQf:US-SANJOSE-1-AD-1' }}
       OCI_SHAPE: "VM.Standard.A1.Flex"
-      OCI_OCPUS: "4"
-      OCI_MEMORY_IN_GBS: "24"
+      OCI_OCPUS: "1"
+      OCI_MEMORY_IN_GBS: "6"
       INSTANCE_DISPLAY_NAME: "default-instance"
       ASSIGN_PUBLIC_IP: "true"
-      OPERATING_SYSTEM: "Oracle Linux"
-      OS_VERSION: "10"
+      OPERATING_SYSTEM: "Canonical Ubuntu"
+      OS_VERSION: "24.04"
       # 引导卷配置
       BOOT_VOLUME_SIZE: "50"
-      # 引导卷 ID 从 Secrets 读取，留空则创建新引导卷
-      # 优先使用形状专用 ID，未设置则回退到通用 ID
-      BOOT_VOLUME_ID: ${{ secrets.OCI_BOOT_VOLUME_ID || '' }}
-      A1_BOOT_VOLUME_ID: ${{ secrets.OCI_A1_BOOT_VOLUME_ID || '' }}
+      # A1 不使用已有引导卷，始终创建新引导卷
+      # E2.Micro 可单独设置引导卷（如需要，通过 OCI_E2_BOOT_VOLUME_ID secret）
       E2_BOOT_VOLUME_ID: ${{ secrets.OCI_E2_BOOT_VOLUME_ID || '' }}
+      # 如需恢复已有引导卷，取消注释以下行：
+      # BOOT_VOLUME_ID: ${{ secrets.OCI_BOOT_VOLUME_ID || '' }}
+      # A1_BOOT_VOLUME_ID: ${{ secrets.OCI_A1_BOOT_VOLUME_ID || '' }}
       # 实例恢复和兼容性设置
       RECOVERY_ACTION: "RESTORE_INSTANCE"
       LEGACY_IMDS_ENDPOINTS: "false"
@@ -125,16 +126,18 @@ jobs:
       INSTANCE_VERIFY_DELAY: "30"
       # 日志配置（设为 'json' 启用结构化日志）
       LOG_FORMAT: "text"
-      # 缓存镜像 ID（需定期更新，以下为新加坡区域镜像）
-      # 切换区域时需更新为对应区域的镜像 OCID，或留空让脚本自动查询
-      OCI_CACHED_OL10_ARM_IMAGE: ${{ secrets.OCI_CACHED_OL10_ARM_IMAGE || (secrets.OCI_REGION == 'ap-singapore-1' && 'ocid1.image.oc1.ap-singapore-1.aaaaaaaay4vc5rcekxthq7cillis3qred5xyz7kmqd6wuaoknk4zukohqlua' || '') }}
-      OCI_CACHED_OL10_AMD_IMAGE: ${{ secrets.OCI_CACHED_OL10_AMD_IMAGE || (secrets.OCI_REGION == 'ap-singapore-1' && 'ocid1.image.oc1.ap-singapore-1.aaaaaaaaitll52n3sr73g2gaclby2ph5whrmb5l3tbo47i6atle6z3cemr6a' || '') }}
+      # 缓存镜像 ID（区域专用；以下默认值仅适用于 us-sanjose-1）
+      OCI_CACHED_UBUNTU_2404_ARM_IMAGE: ${{ secrets.OCI_CACHED_UBUNTU_2404_ARM_IMAGE || ((secrets.OCI_REGION == '' || secrets.OCI_REGION == 'us-sanjose-1') && 'ocid1.image.oc1.us-sanjose-1.aaaaaaaa3bhtihetcgdkvl2srbvm23l5guf5wlmtq3toyht2l6kcuxqa2adq' || '') }}
+      OCI_CACHED_UBUNTU_2404_AMD_IMAGE: ${{ secrets.OCI_CACHED_UBUNTU_2404_AMD_IMAGE || ((secrets.OCI_REGION == '' || secrets.OCI_REGION == 'us-sanjose-1') && 'ocid1.image.oc1.us-sanjose-1.aaaaaaaavoalqgvm37waj5ehczi36mljok5mkv34n2a3ektkdt2wpup6hkwa' || '') }}
+      # Oracle Linux 10 缓存仍可通过 Secret 提供，非 OL10/非匹配形状时会自动忽略
+      OCI_CACHED_OL10_ARM_IMAGE: ${{ secrets.OCI_CACHED_OL10_ARM_IMAGE || '' }}
+      OCI_CACHED_OL10_AMD_IMAGE: ${{ secrets.OCI_CACHED_OL10_AMD_IMAGE || '' }}
       # 自适应调度配置
       ENABLE_ADAPTIVE_SCHEDULING: ${{ github.event_name == 'workflow_dispatch' && (inputs.adaptive_scheduling && 'true' || 'false') || 'true' }}
       ENABLE_REGION_OPTIMIZATION: ${{ github.event_name == 'workflow_dispatch' && (inputs.region_optimization && 'true' || 'false') || 'true' }}
       # 区域时区（新加坡: Asia/Singapore, 圣何塞: America/Los_Angeles, 阿什本: America/New_York）
       # 也可通过 Secret OCI_REGION_TIMEZONE 覆盖
-      OCI_REGION_TIMEZONE: ${{ secrets.OCI_REGION_TIMEZONE || 'Asia/Singapore' }}
+      OCI_REGION_TIMEZONE: ${{ secrets.OCI_REGION_TIMEZONE || 'America/Los_Angeles' }}
       SUCCESS_TRACKING_ENABLED: "true"
     steps:
       - name: 检出仓库
@@ -147,7 +150,7 @@ jobs:
       - name: 生成缓存键（含区域哈希）
         id: cache-key
         env:
-          OCI_REGION: ${{ secrets.OCI_REGION || 'ap-singapore-1' }}
+          OCI_REGION: ${{ secrets.OCI_REGION || 'us-sanjose-1' }}
         run: |
           region_hash=$(echo -n "$OCI_REGION" | sha256sum | cut -d' ' -f1 | head -c 8)
           echo "key=oci-instances-${region_hash}-v1-${{ steps.get-date.outputs.date }}" >> "$GITHUB_OUTPUT"
@@ -224,7 +227,7 @@ jobs:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
           OCI_KEY_FINGERPRINT: ${{ secrets.OCI_KEY_FINGERPRINT }}
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ secrets.OCI_REGION || 'us-sanjose-1' }}
           OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
@@ -240,7 +243,7 @@ jobs:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
           OCI_KEY_FINGERPRINT: ${{ secrets.OCI_KEY_FINGERPRINT }}
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ secrets.OCI_REGION || 'us-sanjose-1' }}
           OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
           OCI_PROXY_URL: ${{ secrets.OCI_PROXY_URL }}
           INSTANCE_SSH_PUBLIC_KEY: ${{ secrets.INSTANCE_SSH_PUBLIC_KEY }}
@@ -276,7 +279,7 @@ jobs:
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ secrets.OCI_REGION || 'us-sanjose-1' }}
           OCI_PROXY_URL: ${{ secrets.OCI_PROXY_URL }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
@@ -312,11 +315,11 @@ jobs:
           
           if [[ $script_exit_code -eq 0 || $script_exit_code -eq 2 || $script_exit_code -eq 5 || $script_exit_code -eq 6 ]]; then
             echo "工作流成功: 退出码 $script_exit_code 表示预期行为"
-            echo "script_exit_code=$script_exit_code" >> $GITHUB_OUTPUT
+            echo "script_exit_code=$script_exit_code" >> "$GITHUB_OUTPUT"
             exit 0
           else
             echo "工作流失败: 退出码 $script_exit_code 表示真实失败"
-            echo "script_exit_code=$script_exit_code" >> $GITHUB_OUTPUT
+            echo "script_exit_code=$script_exit_code" >> "$GITHUB_OUTPUT"
             exit $script_exit_code
           fi
 
@@ -340,7 +343,7 @@ jobs:
         if: always()
         env:
           OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ secrets.OCI_REGION || 'us-sanjose-1' }}
           CACHE_ENABLED: "true"
           CACHE_TTL_HOURS: "24"
           CACHE_DATE_KEY: ${{ steps.get-date.outputs.date }}
@@ -363,7 +366,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ secrets.OCI_REGION || 'us-sanjose-1' }}
         run: ./scripts/schedule-optimizer.sh
 
   notify-on-genuine-failure:

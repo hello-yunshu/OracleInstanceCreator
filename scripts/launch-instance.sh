@@ -70,8 +70,8 @@ lookup_image_id() {
     local image_id
     
     # Set defaults for OS configuration if not provided
-    local operating_system="${OPERATING_SYSTEM:-Oracle Linux}"
-    local os_version="${OS_VERSION:-10}"
+    local operating_system="${OPERATING_SYSTEM:-Canonical Ubuntu}"
+    local os_version="${OS_VERSION:-24.04}"
     
     if [[ -n "${OCI_IMAGE_ID:-}" ]]; then
         image_id="$OCI_IMAGE_ID"
@@ -80,6 +80,18 @@ lookup_image_id() {
         # Try common cached image IDs first
         local cache_key="${operating_system}_${os_version}_${OCI_SHAPE}"
         case "$cache_key" in
+            "Canonical Ubuntu_24.04_VM.Standard.A1.Flex")
+                image_id="${OCI_CACHED_UBUNTU_2404_ARM_IMAGE:-}"
+                if [[ -n "$image_id" ]]; then
+                    log_info "使用缓存的 Ubuntu 24.04 ARM 镜像 ID"
+                fi
+                ;;
+            "Canonical Ubuntu_24.04_VM.Standard.E2.1.Micro")
+                image_id="${OCI_CACHED_UBUNTU_2404_AMD_IMAGE:-}"
+                if [[ -n "$image_id" ]]; then
+                    log_info "使用缓存的 Ubuntu 24.04 AMD 镜像 ID"
+                fi
+                ;;
             "Oracle Linux_10_VM.Standard.A1.Flex")
                 # Common Oracle Linux 10 ARM image ID - update as needed
                 image_id="${OCI_CACHED_OL10_ARM_IMAGE:-}"

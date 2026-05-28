@@ -69,8 +69,8 @@ readonly BOOT_VOLUME_SIZE_DEFAULT=50
 # =============================================================================
 
 readonly A1_FLEX_SHAPE="VM.Standard.A1.Flex"
-readonly A1_FLEX_OCPUS=4
-readonly A1_FLEX_MEMORY_GB=24
+readonly A1_FLEX_OCPUS=1
+readonly A1_FLEX_MEMORY_GB=6
 
 readonly E2_MICRO_SHAPE="VM.Standard.E2.1.Micro"
 
