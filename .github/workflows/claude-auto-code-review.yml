@@ -14,7 +14,11 @@ concurrency:
 
 jobs:
   auto-review:
+    # 前置门禁：Claude GitHub App 未安装时该 action 会以 401 失败（"Claude Code is not installed"）。
+    # 仓库变量 CLAUDE_AUTO_REVIEW 未设置或不为 true 时整个 job 显式 skip，不产生红项。
+    # 安装 App 后把该变量置为 true 即可恢复自动评审。
     if: |
+      vars.CLAUDE_AUTO_REVIEW == 'true' &&
       (github.event_name == 'pull_request' &&
         !contains(github.event.pull_request.title, '[skip-review]') &&
         !contains(github.event.pull_request.title, '[WIP]'))
