@@ -5,9 +5,20 @@ on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   auto-review:
+    # 前置门禁：Claude GitHub App 未安装时该 action 会以 401 失败（"Claude Code is not installed"）。
+    # 仓库变量 CLAUDE_AUTO_REVIEW 未设置或不为 true 时整个 job 显式 skip，不产生红项。
+    # 安装 App 后把该变量置为 true 即可恢复自动评审。
     if: |
+      vars.CLAUDE_AUTO_REVIEW == 'true' &&
       (github.event_name == 'pull_request' &&
         !contains(github.event.pull_request.title, '[skip-review]') &&
         !contains(github.event.pull_request.title, '[WIP]'))
@@ -21,13 +32,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0 # Full history for better diff analysis
 
       - name: PR Review with Progress Tracking
         id: claude-review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1
         env:
           NPM_CONFIG_MAXSOCKETS: "15"
           NPM_CONFIG_NETWORK_CONCURRENCY: "1"

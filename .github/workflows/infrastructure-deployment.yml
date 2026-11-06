@@ -141,7 +141,7 @@ jobs:
       SUCCESS_TRACKING_ENABLED: "true"
     steps:
       - name: 检出仓库
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: 获取当前日期（缓存键）
         id: get-date
@@ -158,7 +158,7 @@ jobs:
 
       - name: 恢复实例状态缓存
         id: cache-instance-state
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: .cache/oci-state
           key: ${{ steps.cache-key.outputs.key }}
@@ -201,7 +201,7 @@ jobs:
         run: echo "oci-cli" > requirements.txt
 
       - name: 配置 Python 环境
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         id: setup-python
         with:
           python-version: '3.x'
@@ -209,7 +209,7 @@ jobs:
           update-environment: true
 
       - name: 缓存 pip 依赖
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ~/.cache/pip
@@ -356,7 +356,7 @@ jobs:
       - name: 保存实例状态缓存
         if: always()
         continue-on-error: true
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: .cache/oci-state
           key: ${{ steps.cache-key.outputs.key }}
@@ -377,7 +377,7 @@ jobs:
     if: failure()
     steps:
       - name: 检出仓库
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: 调试失败分析
         run: |
